@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_asset_loader::{AssetCollection, AssetCollectionApp};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
+use rand::seq::SliceRandom;
 
 fn main() {
     App::new()
@@ -20,8 +21,18 @@ fn main() {
 
 #[derive(AssetCollection)]
 struct ModelAssets {
+    #[asset(path = "models/ground_grass.glb#Scene0")]
+    ground_grass: Handle<Scene>,
+    #[asset(path = "models/ground_pathBend.glb#Scene0")]
+    ground_path_bend: Handle<Scene>,
+    #[asset(path = "models/ground_pathCross.glb#Scene0")]
+    ground_path_cross: Handle<Scene>,
+    #[asset(path = "models/ground_pathEndClosed.glb#Scene0")]
+    ground_path_end_closed: Handle<Scene>,
     #[asset(path = "models/ground_pathSplit.glb#Scene0")]
     ground_path_split: Handle<Scene>,
+    #[asset(path = "models/ground_pathStraight.glb#Scene0")]
+    ground_path_straight: Handle<Scene>,
 }
 
 #[derive(Component, Inspectable, Default)]
@@ -59,8 +70,20 @@ fn setup(mut commands: Commands, models: Res<ModelAssets>) {
         ..default()
     });
 
+    let tiles = [
+        &models.ground_grass,
+        &models.ground_path_bend,
+        &models.ground_path_cross,
+        &models.ground_path_end_closed,
+        &models.ground_path_split,
+        &models.ground_path_straight,
+    ];
+
+    let mut rng = rand::thread_rng();
+
     for x in -10..10 {
         for z in -10..10 {
+            let model = *tiles.choose(&mut rng).unwrap();
             commands
                 .spawn_bundle((
                     Name::from(format!("{x}:{z}")),
@@ -69,7 +92,7 @@ fn setup(mut commands: Commands, models: Res<ModelAssets>) {
                     Coordinates::new(x, z),
                 ))
                 .with_children(|tile| {
-                    tile.spawn_scene(models.ground_path_split.clone());
+                    tile.spawn_scene(model.clone());
                 });
         }
     }
