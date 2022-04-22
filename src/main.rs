@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
 use bevy_mod_picking::*;
-use rand::Rng;
 
 fn main() {
     App::new()
@@ -13,16 +12,37 @@ fn main() {
             brightness: 1.0 / 5.0f32,
         })
         .init_resource::<ModelAssets>()
+        .init_resource::<SelectedTileProto>()
         .add_startup_system(setup)
         .register_inspectable::<Coordinates>()
+        .register_inspectable::<MapTile>()
+        .register_inspectable::<Palette>()
         .add_system(apply_coordinate)
         .add_system(animate_light_direction)
+        .add_system(draw_map)
+        .add_system_to_stage(CoreStage::PostUpdate, on_pick_event)
         .run();
 }
 
 #[derive(Default)]
 struct ModelAssets {
     models: Vec<Handle<Scene>>,
+}
+
+#[derive(Default)]
+struct SelectedTileProto {
+    index: Option<usize>,
+}
+
+#[derive(Component, Inspectable)]
+struct Palette {
+    index: usize,
+}
+
+impl Palette {
+    fn new(index: usize) -> Self {
+        Self { index }
+    }
 }
 
 fn setup(
@@ -34,8 +54,8 @@ fn setup(
 ) {
     commands
         .spawn_bundle(PerspectiveCameraBundle {
-            transform: Transform::from_xyz(-10.0, 10.0, 0.0)
-                .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+            transform: Transform::from_xyz(-10.0, 10.0, 8.0)
+                .looking_at(Vec3::new(4.0, 0.0, 8.0), Vec3::Y),
             ..default()
         })
         .insert_bundle(PickingCameraBundle::default());
@@ -57,13 +77,7 @@ fn setup(
         ..default()
     });
 
-    let mut rng = rand::thread_rng();
-    let mut map = Map::new(64, 64);
-
-    let tile_type_nb = map.tile_models.len();
-    for tile in map.tiles.iter_mut() {
-        *tile = rng.gen_range(0..tile_type_nb);
-    }
+    let map = Map::new(16, 16);
 
     models.models = map
         .tile_models
@@ -71,49 +85,73 @@ fn setup(
         .map(|path| asset_server.load(path))
         .collect();
 
-    let pick_mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
+    let pick_mesh = meshes.add(Mesh::from(shape::Plane { size: 1.0 }));
     let pick_mat = materials.add(StandardMaterial {
         base_color: Color::rgba(1.0, 1.0, 1.0, 0.1),
         alpha_mode: AlphaMode::Blend,
         ..Default::default()
     });
 
+    // Palette
     for i in 0..map.tile_models.len() {
         let model = models.models[i].clone();
         commands
             .spawn_bundle(PbrBundle {
                 material: pick_mat.clone(),
                 mesh: pick_mesh.clone(),
-                transform: Transform::default(),
-                global_transform: GlobalTransform::default(),
                 ..Default::default()
             })
             .insert_bundle(PickableBundle::default())
             .insert_bundle((
                 Name::from(format!("tile proto {i}")),
-                Coordinates::new(-5, 2 * (i as i32) - 4),
+                Coordinates::new(-2, 2 * (i as i32)),
+                Palette::new(i),
             ))
             .with_children(|tile| {
-                tile.spawn_scene(model);
-            });
-    }
-
-    /*for x in 0..map.width {
-        for y in 0..map.height {
-            let idx = map.tile_at(x, y);
-            let model = models.models[idx].clone();
-            commands
-                .spawn_bundle((
-                    Name::from(format!("{x}:{y}")),
-                    Transform::default(),
+                tile.spawn_bundle((
+                    Transform::from_xyz(0.0, 0.1, 0.0),
                     GlobalTransform::default(),
-                    Coordinates::new(x, y),
                 ))
                 .with_children(|tile| {
                     tile.spawn_scene(model);
                 });
+            });
+    }
+
+    // Rule map
+    for x in 0..map.width {
+        for y in 0..map.height {
+            commands
+                .spawn_bundle(PbrBundle {
+                    material: pick_mat.clone(),
+                    mesh: pick_mesh.clone(),
+                    ..Default::default()
+                })
+                .insert_bundle((
+                    Name::from(format!("{x}:{y}")),
+                    Coordinates::new(x as i32, y as i32),
+                    MapTile::default(),
+                ))
+                .insert_bundle(PickableBundle::default());
         }
-    }*/
+    }
+}
+
+fn draw_map(
+    query: Query<(Entity, &MapTile), Changed<MapTile>>,
+    mut commands: Commands,
+    models: Res<ModelAssets>,
+) {
+    for (entity, map_tile) in query.iter() {
+        let mut entity = commands.entity(entity);
+        entity.despawn_descendants();
+        if let Some(index) = map_tile.tile_prototype {
+            entity.with_children(|tile| {
+                let model = models.models[index].clone();
+                tile.spawn_scene(model);
+            });
+        };
+    }
 }
 
 fn apply_coordinate(mut query: Query<(&mut Transform, &Coordinates), Changed<Coordinates>>) {
@@ -121,6 +159,30 @@ fn apply_coordinate(mut query: Query<(&mut Transform, &Coordinates), Changed<Coo
         transform.translation.x = coordinates.x as f32;
         transform.translation.y = 0.;
         transform.translation.z = coordinates.y as f32;
+    }
+}
+
+fn on_pick_event(
+    mut events: EventReader<PickingEvent>,
+    mut selected: ResMut<SelectedTileProto>,
+    palette_query: Query<&Palette>,
+    mut rule_map_query: Query<&mut MapTile>,
+) {
+    for event in events.iter() {
+        match event {
+            PickingEvent::Selection(_) => (),
+            PickingEvent::Hover(_) => (),
+            PickingEvent::Clicked(e) => {
+                match palette_query.get(*e) {
+                    Ok(e) => selected.index = Some(e.index),
+                    Err(_) => (),
+                };
+                match rule_map_query.get_mut(*e) {
+                    Ok(mut e) => e.tile_prototype = selected.index,
+                    Err(_) => (),
+                };
+            }
+        }
     }
 }
 
@@ -140,9 +202,13 @@ fn animate_light_direction(
 
 struct Map {
     pub tile_models: Vec<String>,
-    pub tiles: Vec<usize>,
     pub width: usize,
     pub height: usize,
+}
+
+#[derive(Component, Inspectable, Default)]
+struct MapTile {
+    pub tile_prototype: Option<usize>,
 }
 
 impl Map {
@@ -156,14 +222,9 @@ impl Map {
                 "models/ground_pathSplit.glb#Scene0".to_string(),
                 "models/ground_pathStraight.glb#Scene0".to_string(),
             ],
-            tiles: vec![0; width * height],
             width,
             height,
         }
-    }
-
-    fn tile_at(&self, x: usize, y: usize) -> usize {
-        self.tiles[x + y * self.width]
     }
 }
 
