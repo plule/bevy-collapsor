@@ -1,16 +1,15 @@
 use bevy::prelude::*;
-use bevy_asset_loader::{AssetCollection, AssetCollectionApp};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
-use rand::seq::SliceRandom;
+use rand::Rng;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .init_collection::<ModelAssets>()
         .insert_resource(AmbientLight {
             color: Color::WHITE,
             brightness: 1.0 / 5.0f32,
         })
+        .init_resource::<ModelAssets>()
         .add_plugin(WorldInspectorPlugin::new())
         .add_startup_system(setup)
         .register_inspectable::<Coordinates>()
@@ -19,37 +18,15 @@ fn main() {
         .run();
 }
 
-#[derive(AssetCollection)]
+#[derive(Default)]
 struct ModelAssets {
-    #[asset(path = "models/ground_grass.glb#Scene0")]
-    ground_grass: Handle<Scene>,
-    #[asset(path = "models/ground_pathBend.glb#Scene0")]
-    ground_path_bend: Handle<Scene>,
-    #[asset(path = "models/ground_pathCross.glb#Scene0")]
-    ground_path_cross: Handle<Scene>,
-    #[asset(path = "models/ground_pathEndClosed.glb#Scene0")]
-    ground_path_end_closed: Handle<Scene>,
-    #[asset(path = "models/ground_pathSplit.glb#Scene0")]
-    ground_path_split: Handle<Scene>,
-    #[asset(path = "models/ground_pathStraight.glb#Scene0")]
-    ground_path_straight: Handle<Scene>,
+    models: Vec<Handle<Scene>>,
 }
 
-#[derive(Component, Inspectable, Default)]
-struct Coordinates {
-    pub x: i32,
-    pub z: i32,
-}
-
-impl Coordinates {
-    fn new(x: i32, z: i32) -> Self {
-        Self { x, z }
-    }
-}
-
-fn setup(mut commands: Commands, models: Res<ModelAssets>) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut models: ResMut<ModelAssets>) {
     commands.spawn_bundle(PerspectiveCameraBundle {
-        transform: Transform::from_xyz(0.7, 5.0, 1.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+        transform: Transform::from_xyz(0.0, 50.0, 0.0)
+            .looking_at(Vec3::new(32.0, 0.0, 32.0), Vec3::Y),
         ..default()
     });
     const HALF_SIZE: f32 = 1.0;
@@ -70,29 +47,33 @@ fn setup(mut commands: Commands, models: Res<ModelAssets>) {
         ..default()
     });
 
-    let tiles = [
-        &models.ground_grass,
-        &models.ground_path_bend,
-        &models.ground_path_cross,
-        &models.ground_path_end_closed,
-        &models.ground_path_split,
-        &models.ground_path_straight,
-    ];
-
     let mut rng = rand::thread_rng();
+    let mut map = Map::new(64, 64);
 
-    for x in -10..10 {
-        for z in -10..10 {
-            let model = *tiles.choose(&mut rng).unwrap();
+    let tile_type_nb = map.tile_models.len();
+    for tile in map.tiles.iter_mut() {
+        *tile = rng.gen_range(0..tile_type_nb);
+    }
+
+    models.models = map
+        .tile_models
+        .iter()
+        .map(|path| asset_server.load(path))
+        .collect();
+
+    for x in 0..map.width {
+        for y in 0..map.height {
+            let idx = map.tile_at(x, y);
+            let model = models.models[idx].clone();
             commands
                 .spawn_bundle((
-                    Name::from(format!("{x}:{z}")),
+                    Name::from(format!("{x}:{y}")),
                     Transform::default(),
                     GlobalTransform::default(),
-                    Coordinates::new(x, z),
+                    Coordinates::new(x, y),
                 ))
                 .with_children(|tile| {
-                    tile.spawn_scene(model.clone());
+                    tile.spawn_scene(model);
                 });
         }
     }
@@ -118,4 +99,50 @@ fn animate_light_direction(
             -std::f32::consts::FRAC_PI_4,
         );
     }
+}
+
+struct Map {
+    pub tile_models: Vec<String>,
+    pub tiles: Vec<usize>,
+    pub width: usize,
+    pub height: usize,
+}
+
+impl Map {
+    fn new(width: usize, height: usize) -> Self {
+        Self {
+            tile_models: vec![
+                "models/ground_grass.glb#Scene0".to_string(),
+                "models/ground_pathBend.glb#Scene0".to_string(),
+                "models/ground_pathCross.glb#Scene0".to_string(),
+                "models/ground_pathEndClosed.glb#Scene0".to_string(),
+                "models/ground_pathSplit.glb#Scene0".to_string(),
+                "models/ground_pathStraight.glb#Scene0".to_string(),
+            ],
+            tiles: vec![0; width * height],
+            width,
+            height,
+        }
+    }
+
+    fn tile_at(&self, x: usize, y: usize) -> usize {
+        self.tiles[x + y * self.width]
+    }
+}
+
+#[derive(Component, Inspectable, Default)]
+struct Coordinates {
+    pub x: usize,
+    pub z: usize,
+}
+
+impl Coordinates {
+    fn new(x: usize, z: usize) -> Self {
+        Self { x, z }
+    }
+}
+
+#[derive(Component, Inspectable)]
+struct TileType {
+    file: String,
 }
