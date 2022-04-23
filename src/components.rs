@@ -65,9 +65,9 @@ impl Orientation {
     pub fn offset(&self, coordinate: &Coordinates) -> Coordinates {
         match self {
             Orientation::NORTH => Coordinates::new(coordinate.x, coordinate.y + 1),
-            Orientation::EST => Coordinates::new(coordinate.x + 1, coordinate.y),
+            Orientation::EST => Coordinates::new(coordinate.x - 1, coordinate.y),
             Orientation::SOUTH => Coordinates::new(coordinate.x, coordinate.y - 1),
-            Orientation::WEST => Coordinates::new(coordinate.x - 1, coordinate.y),
+            Orientation::WEST => Coordinates::new(coordinate.x + 1, coordinate.y),
         }
     }
 }

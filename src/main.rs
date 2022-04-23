@@ -39,7 +39,6 @@ fn main() {
         .add_system(collapse)
         .add_system_to_stage(CoreStage::PostUpdate, on_mouse_wheel)
         .add_system_to_stage(CoreStage::PostUpdate, palette_select)
-        .add_system_to_stage(CoreStage::PostUpdate, read_rules)
         .run();
 }
 
@@ -361,52 +360,6 @@ fn get_tile_entity(map: &Vec<Vec<Entity>>, coordinates: &Coordinates) -> Option<
     Some(tile.clone())
 }
 
-fn read_rules(
-    mut event_reader: EventReader<RulesNeedUpdateEvent>,
-    map: Res<Map>,
-    mut rules: ResMut<Rules>,
-    query: Query<(&OptionalTilePrototype, &Coordinates), With<RuleTileTag>>,
-) {
-    if event_reader.is_empty() {
-        return;
-    }
-    for _ in event_reader.iter() {}
-
-    // Read the rule map
-    let mut rule_tiles = vec![vec![OptionalTilePrototype::default(); map.height]; map.width];
-    for (tile, coordinates) in query.iter() {
-        rule_tiles[coordinates.x as usize][coordinates.y as usize] = tile.clone();
-    }
-
-    // Store the rule connectivities as constraints
-    rules.constraints = HashMap::<TilePrototype, Constraints>::new();
-    for x in 0..map.width {
-        for y in 0..map.height {
-            let tile = &rule_tiles[x][y];
-            let coords = Coordinates::new(x as i32, y as i32);
-            if let Some(tile) = &tile.tile_prototype {
-                let constraints = &mut rules
-                    .constraints
-                    .entry(tile.clone())
-                    .or_default()
-                    .constraints;
-
-                for orientation in Orientation::values() {
-                    let neighbour_coords = orientation.offset(&coords);
-                    let neighbour_tile = get_tile_prototype(&rule_tiles, &neighbour_coords);
-                    if let Some(neighbour_tile) = neighbour_tile {
-                        constraints
-                            .entry(orientation)
-                            .or_default()
-                            .insert(neighbour_tile);
-                    }
-                }
-            }
-        }
-    }
-    rules.constraints = expand_with_rotations(&rules.constraints);
-}
-
 fn expand_with_rotations(
     constraints: &HashMap<TilePrototype, Constraints>,
 ) -> HashMap<TilePrototype, Constraints> {
@@ -434,44 +387,104 @@ fn intersection<T: Eq + Hash>(a: HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
     a.into_iter().filter(|e| b.contains(e)).collect()
 }
 
-fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype, &Connectivity)>) {
+fn collapse(
+    map: Res<Map>,
+    mut rules: ResMut<Rules>,
+    rules_query: Query<(&OptionalTilePrototype, &Coordinates), With<RuleTileTag>>,
+    mut event_reader: EventReader<RulesNeedUpdateEvent>,
+    mut tiles_query: Query<(Entity, &mut MultiTilePrototype, &Connectivity)>,
+) {
     let mut rng = rand::thread_rng();
 
-    if rules.constraints.is_empty() {
-        return;
-    }
+    if !event_reader.is_empty() {
+        info!("Rules changed, clearing");
+        for _ in event_reader.iter() {}
+        // Rule change
 
-    // Reset to every possibilities on rule change
-    if rules.is_changed() {
+        // Read the rule map
+        let mut rule_tiles = vec![vec![OptionalTilePrototype::default(); map.height]; map.width];
+        for (tile, coordinates) in rules_query.iter() {
+            rule_tiles[coordinates.x as usize][coordinates.y as usize] = tile.clone();
+        }
+
+        // Store the rule connectivities as constraints
+        rules.constraints = HashMap::<TilePrototype, Constraints>::new();
+        for x in 0..map.width {
+            for y in 0..map.height {
+                let tile = &rule_tiles[x][y];
+                let coords = Coordinates::new(x as i32, y as i32);
+                if let Some(tile) = &tile.tile_prototype {
+                    let constraints = &mut rules
+                        .constraints
+                        .entry(tile.clone())
+                        .or_default()
+                        .constraints;
+
+                    for orientation in Orientation::values() {
+                        let neighbour_coords = orientation.offset(&coords);
+                        let neighbour_tile = get_tile_prototype(&rule_tiles, &neighbour_coords);
+                        if let Some(neighbour_tile) = neighbour_tile {
+                            constraints
+                                .entry(orientation)
+                                .or_default()
+                                .insert(neighbour_tile);
+                        }
+                    }
+                }
+            }
+        }
+        rules.constraints = expand_with_rotations(&rules.constraints);
+
+        // Reset to every possibilities on rule change
         let mut possible_tiles = HashSet::new();
         for tile in rules.constraints.keys() {
             possible_tiles.insert(tile.clone());
         }
-        for (_, mut multi_tile_prototype, _) in query.iter_mut() {
+        for (_, mut multi_tile_prototype, _) in tiles_query.iter_mut() {
             multi_tile_prototype.tiles = possible_tiles.clone();
         }
     }
 
+    // Store locally the state
+    let mut entity_indexes = HashMap::<Entity, usize>::new();
+    let mut entities = Vec::new();
+    let mut index: usize = 0;
+    for (entity, _, _) in tiles_query.iter() {
+        entity_indexes.insert(entity, index);
+        entities.push(entity);
+        index += 1;
+    }
+    let count = index;
+
+    let mut waves = Vec::new();
+    let mut connectivities = Vec::new();
+    for (_, multi_line_prototype, connectivity) in tiles_query.iter() {
+        waves.push(multi_line_prototype.tiles.clone());
+        let mut connectivity_by_index = HashMap::new();
+        for (orientation, entity) in connectivity.connectivity.iter() {
+            connectivity_by_index.insert(*orientation, *entity_indexes.get(entity).unwrap());
+        }
+        connectivities.push(connectivity_by_index);
+    }
+
     // Find the smallest > 1 entropy
     let mut min_entropy = usize::MAX;
-    let mut min_entropy_entity = Option::<Entity>::default();
-    for (entity, multi_line_prototype, _) in query.iter() {
-        let entropy = multi_line_prototype.tiles.len();
+    let mut min_entropy_entity = Option::<usize>::default();
+
+    for i in 0..count {
+        let entropy = waves[i].len();
         if entropy < min_entropy && entropy > 1 {
             min_entropy = entropy;
-            min_entropy_entity = Some(entity);
+            min_entropy_entity = Some(i);
         }
     }
 
     if let Some(min_entropy_entity) = min_entropy_entity {
         // Observe the tile with the smallest entropy
-        let mut multi_tile_prototype = query
-            .get_component_mut::<MultiTilePrototype>(min_entropy_entity)
-            .unwrap();
-        observe(&mut multi_tile_prototype, &mut rng);
+        observe(&mut waves[min_entropy_entity], &mut rng);
 
         // Propagate
-        let mut need_propagation = HashSet::<Entity>::new();
+        let mut need_propagation = HashSet::<usize>::new();
         need_propagation.insert(min_entropy_entity);
         while !need_propagation.is_empty() {
             info!("Propagating to {} entities", need_propagation.len());
@@ -481,17 +494,15 @@ fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype
             need_propagation.take(&propagating_entity).unwrap();
 
             // Get all its allowed values and its connectivity
-            let (_, propagating_allowed_values, propagating_connectivity) =
-                query.get(propagating_entity).unwrap();
-            let propagating_allowed_values = propagating_allowed_values.tiles.clone();
-            let propagating_connectivity = propagating_connectivity.clone().connectivity;
+            let propagating_wave = waves[propagating_entity].clone();
+            let propagating_connectivity = connectivities[propagating_entity].clone();
 
             // Find its neighbours
             for orientation in Orientation::values() {
                 if let Some(neighbour) = propagating_connectivity.get(&orientation) {
                     // Sum all the possible values for this neighbour given its own allowed values
                     let mut all_allowed_neighbour = HashSet::<TilePrototype>::new();
-                    for value in &propagating_allowed_values {
+                    for value in &propagating_wave {
                         let rule_constraints = rules
                             .constraints
                             .get(value)
@@ -504,28 +515,36 @@ fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype
                     }
 
                     // Intersect the previous list of allowed values with the new constraints
-                    let mut current_allowed_neighbour = query
-                        .get_component_mut::<MultiTilePrototype>(*neighbour)
-                        .unwrap();
                     let new_allowed_values =
-                        intersection(all_allowed_neighbour, &current_allowed_neighbour.tiles);
+                        intersection(all_allowed_neighbour, &waves[*neighbour]);
 
                     // If impacted, update the tile and add it to the list needing propagation
-                    if new_allowed_values != current_allowed_neighbour.tiles {
+                    if &new_allowed_values != &waves[*neighbour] {
                         need_propagation.insert(*neighbour);
-                        current_allowed_neighbour.tiles = new_allowed_values;
+                        waves[*neighbour].clear();
+                        waves[*neighbour].extend(new_allowed_values.iter());
                     }
                 }
             }
         }
     }
+
+    // Apply the result to the entities
+    for i in 0..count {
+        let mut multitiles = tiles_query
+            .get_component_mut::<MultiTilePrototype>(entities[i])
+            .unwrap();
+        if multitiles.tiles != waves[i] {
+            multitiles.tiles = waves[i].clone();
+        }
+    }
 }
 
-fn observe(multi_tile_prototype: &mut MultiTilePrototype, rng: &mut rand::prelude::ThreadRng) {
-    let tile_vec: Vec<&TilePrototype> = multi_tile_prototype.tiles.iter().collect();
+fn observe(multi_tile_prototype: &mut HashSet<TilePrototype>, rng: &mut rand::prelude::ThreadRng) {
+    let tile_vec: Vec<&TilePrototype> = multi_tile_prototype.iter().collect();
     let observed = *tile_vec.choose(rng).unwrap().clone();
-    multi_tile_prototype.tiles.clear();
-    multi_tile_prototype.tiles.insert(observed.clone());
+    multi_tile_prototype.clear();
+    multi_tile_prototype.insert(observed.clone());
 }
 
 fn palette_select(
