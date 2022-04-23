@@ -25,6 +25,7 @@ fn main() {
         .register_inspectable::<OptionalTilePrototype>()
         .add_system(apply_coordinate)
         .add_system(animate_light_direction)
+        .add_system(pick_tile)
         .add_system(pick_draw_tile)
         .add_system(draw_map)
         .add_system_to_stage(CoreStage::PostUpdate, on_mouse_wheel)
@@ -293,11 +294,31 @@ fn apply_coordinate(mut query: Query<(&mut Transform, &Coordinates), Changed<Coo
     }
 }
 
+fn pick_tile(
+    mut query: Query<(&mut OptionalTilePrototype, &Hover)>,
+    selected: Res<SelectedTileProto>,
+    mouse_button_input: Res<Input<MouseButton>>,
+) {
+    let new_tile;
+    if mouse_button_input.pressed(MouseButton::Left) {
+        new_tile = selected.tile_prototype.clone();
+    } else if mouse_button_input.pressed(MouseButton::Right) {
+        new_tile = OptionalTilePrototype::default();
+    } else {
+        return;
+    }
+
+    for (mut map_tile, hover) in query.iter_mut() {
+        if hover.hovered() && *map_tile != new_tile {
+            *map_tile = new_tile.clone();
+        }
+    }
+}
+
 fn on_pick_event(
     mut events: EventReader<PickingEvent>,
     mut selected: ResMut<SelectedTileProto>,
     palette_query: Query<&Palette>,
-    mut tile_prototype_query: Query<&mut OptionalTilePrototype>,
 ) {
     for event in events.iter() {
         match event {
@@ -306,10 +327,6 @@ fn on_pick_event(
             PickingEvent::Clicked(e) => {
                 match palette_query.get(*e) {
                     Ok(e) => selected.tile_prototype = OptionalTilePrototype::from_index(e.index),
-                    Err(_) => (),
-                };
-                match tile_prototype_query.get_mut(*e) {
-                    Ok(mut e) => *e = selected.tile_prototype.clone(),
                     Err(_) => (),
                 };
             }
