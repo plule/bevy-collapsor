@@ -1,8 +1,11 @@
-use bevy::{ecs::event::Events, input::mouse::MouseWheel, prelude::*, utils::HashMap};
-use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
+use std::collections::HashMap;
+
+use bevy::{ecs::event::Events, input::mouse::MouseWheel, prelude::*};
+use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
 use bevy_mod_picking::*;
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
+
+mod components;
+use components::*;
 
 fn main() {
     App::new()
@@ -33,113 +36,6 @@ fn main() {
         .add_system_to_stage(CoreStage::PostUpdate, on_pick_event)
         .add_system_to_stage(CoreStage::PostUpdate, read_rules)
         .run();
-}
-
-#[derive(Default)]
-struct ModelAssets {
-    models: Vec<Handle<Scene>>,
-    up_cube_mesh: Handle<Mesh>,
-    up_cube_mat: Handle<StandardMaterial>,
-}
-
-#[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive, Hash, Eq, Debug)]
-enum Orientation {
-    NORTH = 0,
-    EST,
-    SOUTH,
-    WEST,
-}
-
-impl Default for Orientation {
-    fn default() -> Self {
-        Orientation::NORTH
-    }
-}
-
-impl From<Orientation> for Quat {
-    fn from(orientation: Orientation) -> Self {
-        let angle = match orientation {
-            Orientation::NORTH => 0.,
-            Orientation::EST => -90.0_f32.to_radians(),
-            Orientation::SOUTH => -180.0_f32.to_radians(),
-            Orientation::WEST => -270.0_f32.to_radians(),
-        };
-        Quat::from_rotation_y(angle)
-    }
-}
-
-impl Orientation {
-    fn rotate(&mut self, amount: i32) {
-        *self = FromPrimitive::from_i32(((*self as i32) + amount).rem_euclid(4)).unwrap();
-    }
-}
-
-#[cfg(test)]
-#[test]
-fn rotate_orientation() {
-    let mut orientation = Orientation::NORTH;
-    orientation.rotate(-2);
-    assert!(orientation == Orientation::SOUTH);
-    orientation.rotate(1);
-    assert!(orientation == Orientation::WEST);
-}
-
-#[derive(Default, Component, Inspectable, Clone, PartialEq, Hash, Eq, Debug)]
-struct TilePrototype {
-    model_index: usize,
-    orientation: Orientation,
-}
-
-#[derive(Default, Component, Inspectable, Clone, PartialEq)]
-struct OptionalTilePrototype {
-    tile_prototype: Option<TilePrototype>,
-}
-
-#[derive(Default, Component, Inspectable, Clone, PartialEq)]
-struct DrawTile {
-    tile: OptionalTilePrototype,
-}
-
-impl OptionalTilePrototype {
-    pub fn from_index(index: usize) -> OptionalTilePrototype {
-        OptionalTilePrototype {
-            tile_prototype: Some(TilePrototype {
-                model_index: index,
-                ..Default::default()
-            }),
-        }
-    }
-}
-
-#[derive(Default, Inspectable)]
-struct SelectedTileProto {
-    tile_prototype: OptionalTilePrototype,
-}
-
-#[derive(Component, Inspectable, Default)]
-struct RuleTileTag;
-
-#[derive(Component, Inspectable)]
-struct Palette {
-    index: usize,
-}
-
-impl Palette {
-    fn new(index: usize) -> Self {
-        Self { index }
-    }
-}
-
-#[derive(Component, Inspectable, Default)]
-struct Coordinates {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Coordinates {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
 }
 
 fn setup(
@@ -377,16 +273,6 @@ fn pick_tile(
     }
 }
 
-struct RulesNeedUpdateEvent {}
-
-#[derive(Default, Debug)]
-struct Constraints {
-    pub top: Vec<TilePrototype>,
-    pub right: Vec<TilePrototype>,
-    pub down: Vec<TilePrototype>,
-    pub left: Vec<TilePrototype>,
-}
-
 /// Safe tile get from indexes
 fn get_tile_prototype(
     map: &Vec<Vec<OptionalTilePrototype>>,
@@ -486,30 +372,5 @@ fn animate_light_direction(
             time.seconds_since_startup() as f32 * std::f32::consts::TAU / 20.0,
             -std::f32::consts::FRAC_PI_4,
         );
-    }
-}
-
-struct Map {
-    pub tile_models: Vec<String>,
-    pub width: usize,
-    pub height: usize,
-    pub constraints: HashMap<TilePrototype, Constraints>,
-}
-
-impl Map {
-    fn new(width: usize, height: usize) -> Self {
-        Self {
-            tile_models: vec![
-                "models/ground_grass.glb#Scene0".to_string(),
-                "models/ground_pathBend.glb#Scene0".to_string(),
-                "models/ground_pathCross.glb#Scene0".to_string(),
-                "models/ground_pathEndClosed.glb#Scene0".to_string(),
-                "models/ground_pathSplit.glb#Scene0".to_string(),
-                "models/ground_pathStraight.glb#Scene0".to_string(),
-            ],
-            constraints: Default::default(),
-            width,
-            height,
-        }
     }
 }
