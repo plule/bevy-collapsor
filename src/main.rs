@@ -93,62 +93,85 @@ fn setup(
     });
 
     // Palette
-    for i in 0..map.tile_models.len() {
-        let model = models.models[i].clone();
-        commands
-            .spawn_bundle(PbrBundle {
-                material: pick_mat.clone(),
-                mesh: pick_mesh.clone(),
-                ..Default::default()
-            })
-            .insert_bundle(PickableBundle::default())
-            .insert_bundle((
-                Name::from(format!("tile proto {i}")),
-                Coordinates::new(-2, 2 * (i as i32)),
-                Palette::new(i),
-            ))
-            .with_children(|tile| {
+    commands
+        .spawn_bundle(TransformBundle::from(Transform::from_xyz(-2.0, 0.0, 0.0)))
+        .insert(Name::from("palette"))
+        .with_children(|palette| {
+            for i in 0..map.tile_models.len() {
+                let model = models.models[i].clone();
+                palette
+                    .spawn_bundle(PbrBundle {
+                        material: pick_mat.clone(),
+                        mesh: pick_mesh.clone(),
+                        ..Default::default()
+                    })
+                    .insert_bundle(PickableBundle::default())
+                    .insert_bundle((
+                        Name::from(format!("tile proto {i}")),
+                        Coordinates::new(0, 2 * (i as i32)),
+                        Palette::new(i),
+                    ))
+                    .with_children(|tile| {
+                        tile.spawn_bundle((
+                            Transform::from_xyz(0.0, 0.2, 0.0),
+                            GlobalTransform::default(),
+                        ))
+                        .with_children(|tile| {
+                            tile.spawn_scene(model);
+                        });
+                    });
+            }
+        });
+
+    // Rule map
+    commands
+        .spawn_bundle(TransformBundle::from(Transform::from_xyz(0.0, 0.0, 0.0)))
+        .insert(Name::from("rule_map"))
+        .with_children(|rule_map| {
+            for x in 0..map.width {
+                for y in 0..map.height {
+                    rule_map
+                        .spawn_bundle(PbrBundle {
+                            material: pick_mat.clone(),
+                            mesh: pick_mesh.clone(),
+                            ..Default::default()
+                        })
+                        .insert_bundle((
+                            Name::from(format!("{x}:{y}")),
+                            Coordinates::new(x as i32, y as i32),
+                            MapTile::default(),
+                        ))
+                        .insert_bundle(PickableBundle::default());
+                }
+            }
+        });
+}
+
+fn draw_map(
+    query: Query<(Entity, &MapTile, &Hover), Or<(Changed<MapTile>, Changed<Hover>)>>,
+    mut commands: Commands,
+    models: Res<ModelAssets>,
+    selected: Res<SelectedTileProto>,
+) {
+    for (entity, map_tile, hover) in query.iter() {
+        let mut entity = commands.entity(entity);
+        entity.despawn_descendants();
+
+        let draw_index = match hover.hovered() {
+            true => selected.index,
+            false => map_tile.tile_prototype,
+        };
+
+        if let Some(index) = draw_index {
+            entity.with_children(|tile| {
+                let model = models.models[index].clone();
                 tile.spawn_bundle((
-                    Transform::from_xyz(0.0, 0.1, 0.0),
+                    Transform::from_xyz(0.0, 0.2, 0.0),
                     GlobalTransform::default(),
                 ))
                 .with_children(|tile| {
                     tile.spawn_scene(model);
                 });
-            });
-    }
-
-    // Rule map
-    for x in 0..map.width {
-        for y in 0..map.height {
-            commands
-                .spawn_bundle(PbrBundle {
-                    material: pick_mat.clone(),
-                    mesh: pick_mesh.clone(),
-                    ..Default::default()
-                })
-                .insert_bundle((
-                    Name::from(format!("{x}:{y}")),
-                    Coordinates::new(x as i32, y as i32),
-                    MapTile::default(),
-                ))
-                .insert_bundle(PickableBundle::default());
-        }
-    }
-}
-
-fn draw_map(
-    query: Query<(Entity, &MapTile), Changed<MapTile>>,
-    mut commands: Commands,
-    models: Res<ModelAssets>,
-) {
-    for (entity, map_tile) in query.iter() {
-        let mut entity = commands.entity(entity);
-        entity.despawn_descendants();
-        if let Some(index) = map_tile.tile_prototype {
-            entity.with_children(|tile| {
-                let model = models.models[index].clone();
-                tile.spawn_scene(model);
             });
         };
     }
