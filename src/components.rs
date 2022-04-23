@@ -30,6 +30,17 @@ impl Default for Orientation {
     }
 }
 
+impl From<Orientation> for Coordinates {
+    fn from(orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::NORTH => Coordinates::new(0, 1),
+            Orientation::EST => Coordinates::new(1, 0),
+            Orientation::SOUTH => Coordinates::new(0, -1),
+            Orientation::WEST => Coordinates::new(-1, 0),
+        }
+    }
+}
+
 impl From<Orientation> for Quat {
     fn from(orientation: Orientation) -> Self {
         let angle = match orientation {
@@ -115,18 +126,12 @@ pub struct RulesNeedUpdateEvent {}
 
 #[derive(Default, Debug, Clone)]
 pub struct Constraints {
-    pub top: HashSet<TilePrototype>,
-    pub right: HashSet<TilePrototype>,
-    pub down: HashSet<TilePrototype>,
-    pub left: HashSet<TilePrototype>,
+    pub constraints: HashMap<Orientation, HashSet<TilePrototype>>,
 }
 
-#[derive(Component, Default, Inspectable, Clone)]
+#[derive(Component, Default, Clone)]
 pub struct Connectivity {
-    pub top: Option<Entity>,
-    pub right: Option<Entity>,
-    pub down: Option<Entity>,
-    pub left: Option<Entity>,
+    pub connectivity: HashMap<Orientation, Entity>,
 }
 
 pub struct Map {

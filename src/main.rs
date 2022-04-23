@@ -30,7 +30,6 @@ fn main() {
         .register_inspectable::<TilePrototype>()
         .register_inspectable::<SelectedTileProto>()
         .register_inspectable::<OptionalTilePrototype>()
-        .register_inspectable::<Connectivity>()
         .add_system(apply_coordinate)
         .add_system(animate_light_direction)
         .add_system(pick_tile)
@@ -197,12 +196,21 @@ fn setup(
             let mut entity = commands.entity(map_entities[x][y]);
             let x = x as i32;
             let y = y as i32;
-            entity.insert(Connectivity {
-                top: get_tile_entity(&map_entities, x, y + 1),
-                right: get_tile_entity(&map_entities, x + 1, y),
-                down: get_tile_entity(&map_entities, x, y - 1),
-                left: get_tile_entity(&map_entities, x - 1, y),
-            });
+            let mut connectivity = HashMap::new();
+            if let Some(e) = get_tile_entity(&map_entities, x, y + 1) {
+                connectivity.insert(Orientation::NORTH, e);
+            }
+            if let Some(e) = get_tile_entity(&map_entities, x + 1, y) {
+                connectivity.insert(Orientation::EST, e);
+            }
+            if let Some(e) = get_tile_entity(&map_entities, x, y - 1) {
+                connectivity.insert(Orientation::SOUTH, e);
+            }
+            if let Some(e) = get_tile_entity(&map_entities, x - 1, y) {
+                connectivity.insert(Orientation::WEST, e);
+            }
+
+            entity.insert(Connectivity { connectivity });
         }
     }
 
@@ -388,18 +396,34 @@ fn read_rules(
             let x = x as i32;
             let y = y as i32;
             if let Some(tile) = &tile.tile_prototype {
-                let constraints = rules.constraints.entry(tile.clone()).or_default();
+                let constraints = &mut rules
+                    .constraints
+                    .entry(tile.clone())
+                    .or_default()
+                    .constraints;
                 if let Some(top) = get_tile_prototype(&rule_tiles, x, y + 1) {
-                    constraints.top.insert(top);
+                    constraints
+                        .entry(Orientation::NORTH)
+                        .or_default()
+                        .insert(top);
                 }
                 if let Some(right) = get_tile_prototype(&rule_tiles, x + 1, y) {
-                    constraints.right.insert(right);
+                    constraints
+                        .entry(Orientation::EST)
+                        .or_default()
+                        .insert(right);
                 }
                 if let Some(down) = get_tile_prototype(&rule_tiles, x, y - 1) {
-                    constraints.down.insert(down);
+                    constraints
+                        .entry(Orientation::SOUTH)
+                        .or_default()
+                        .insert(down);
                 }
                 if let Some(left) = get_tile_prototype(&rule_tiles, x - 1, y) {
-                    constraints.left.insert(left);
+                    constraints
+                        .entry(Orientation::WEST)
+                        .or_default()
+                        .insert(left);
                 }
             }
         }
@@ -454,25 +478,25 @@ fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype
             (connectivity.clone(), constraints.clone())
         };
 
+        let mut connectivity = connectivity.connectivity;
+        let constraints = constraints.constraints;
+
         // Propagate to its neighbours
-        if let Some(e) = connectivity.top {
-            let (_, mut tiles, _) = query.get_mut(e).unwrap();
-            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.top);
-        }
-
-        if let Some(e) = connectivity.right {
-            let (_, mut tiles, _) = query.get_mut(e).unwrap();
-            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.right);
-        }
-
-        if let Some(e) = connectivity.down {
-            let (_, mut tiles, _) = query.get_mut(e).unwrap();
-            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.down);
-        }
-
-        if let Some(e) = connectivity.left {
-            let (_, mut tiles, _) = query.get_mut(e).unwrap();
-            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.left);
+        for orientation in [
+            Orientation::NORTH,
+            Orientation::EST,
+            Orientation::SOUTH,
+            Orientation::WEST,
+        ] {
+            if let Some(e) = connectivity.get(&orientation) {
+                let (_, mut tiles, _) = query.get_mut(*e).unwrap();
+                let allowed = constraints.get(&orientation);
+                if let Some(allowed) = allowed {
+                    tiles.tiles = intersection(tiles.tiles.clone(), allowed);
+                } else {
+                    tiles.tiles.clear();
+                }
+            }
         }
     }
 }
