@@ -78,6 +78,15 @@ pub struct TilePrototype {
     pub orientation: Orientation,
 }
 
+impl TilePrototype {
+    pub fn rotated(&self, amount: i32) -> Self {
+        TilePrototype {
+            model_index: self.model_index,
+            orientation: self.orientation.rotated(amount),
+        }
+    }
+}
+
 #[derive(Default, Component, Inspectable, Clone, PartialEq)]
 pub struct OptionalTilePrototype {
     pub tile_prototype: Option<TilePrototype>,
