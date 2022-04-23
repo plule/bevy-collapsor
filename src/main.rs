@@ -465,7 +465,9 @@ fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype
 
     if let Some(min_entropy_entity) = min_entropy_entity {
         // Observe the tile with the smallest entropy
-        let (_, mut multi_tile_prototype, _) = query.get_mut(min_entropy_entity).unwrap();
+        let mut multi_tile_prototype = query
+            .get_component_mut::<MultiTilePrototype>(min_entropy_entity)
+            .unwrap();
         observe(&mut multi_tile_prototype, &mut rng);
 
         // Propagate
@@ -502,7 +504,9 @@ fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype
                     }
 
                     // Intersect the previous list of allowed values with the new constraints
-                    let (_, mut current_allowed_neighbour, _) = query.get_mut(*neighbour).unwrap();
+                    let mut current_allowed_neighbour = query
+                        .get_component_mut::<MultiTilePrototype>(*neighbour)
+                        .unwrap();
                     let new_allowed_values =
                         intersection(all_allowed_neighbour, &current_allowed_neighbour.tiles);
 
