@@ -468,18 +468,24 @@ fn collapse(
     }
 
     // Find the smallest > 1 entropy
+    let mut min_entropy_entities = Vec::new();
     let mut min_entropy = usize::MAX;
-    let mut min_entropy_entity = Option::<usize>::default();
 
     for i in 0..count {
         let entropy = waves[i].len();
         if entropy < min_entropy && entropy > 1 {
             min_entropy = entropy;
-            min_entropy_entity = Some(i);
+            min_entropy_entities.clear();
+        }
+
+        if entropy == min_entropy {
+            min_entropy_entities.push(i);
         }
     }
+    let min_entropy_entity = min_entropy_entities.choose(&mut rng);
 
     if let Some(min_entropy_entity) = min_entropy_entity {
+        let min_entropy_entity = *min_entropy_entity;
         // Observe the tile with the smallest entropy
         observe(&mut waves[min_entropy_entity], &mut rng);
 

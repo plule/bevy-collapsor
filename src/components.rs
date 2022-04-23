@@ -182,8 +182,8 @@ impl Map {
             "models/ground_riverCross.glb#Scene0".to_string(),
             "models/ground_riverEndClosed.glb#Scene0".to_string(),
             "models/ground_riverOpen.glb#Scene0".to_string(),
-            "models/ground_riverRocks.glb#Scene0".to_string(),
             "models/ground_riverSide.glb#Scene0".to_string(),
+            "models/ground_riverSideOpen.glb#Scene0".to_string(),
             "models/ground_riverSplit.glb#Scene0".to_string(),
             "models/ground_riverStraight.glb#Scene0".to_string(),
         ];
