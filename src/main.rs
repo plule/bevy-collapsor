@@ -36,6 +36,8 @@ fn main() {
 #[derive(Default)]
 struct ModelAssets {
     models: Vec<Handle<Scene>>,
+    up_cube_mesh: Handle<Mesh>,
+    up_cube_mat: Handle<StandardMaterial>,
 }
 
 #[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive)]
@@ -171,6 +173,9 @@ fn setup(
         .map(|path| asset_server.load(path))
         .collect();
 
+    models.up_cube_mesh = meshes.add(shape::Cube { size: 0.1 }.into());
+    models.up_cube_mat = materials.add(Color::RED.into());
+
     let pick_mesh = meshes.add(Mesh::from(shape::Plane { size: 1.0 }));
     let pick_mat = materials.add(StandardMaterial {
         base_color: Color::rgba(1.0, 1.0, 1.0, 0.1),
@@ -300,6 +305,12 @@ fn draw_map(
                 tile.spawn_bundle((transform, GlobalTransform::default()))
                     .with_children(|tile| {
                         tile.spawn_scene(model);
+                        tile.spawn_bundle(PbrBundle {
+                            material: models.up_cube_mat.clone(),
+                            mesh: models.up_cube_mesh.clone(),
+                            transform: Transform::from_translation(-Vec3::Z / 2.5), // TODO appears on the left
+                            ..Default::default()
+                        });
                     });
             });
         };
