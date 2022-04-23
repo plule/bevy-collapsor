@@ -170,12 +170,22 @@ pub struct Rules {
 impl Map {
     pub fn new(width: usize, height: usize) -> Self {
         let tile_models = vec![
+            "models/bridge_wood.glb#Scene0".to_string(),
             "models/ground_grass.glb#Scene0".to_string(),
             "models/ground_pathBend.glb#Scene0".to_string(),
             "models/ground_pathCross.glb#Scene0".to_string(),
             "models/ground_pathEndClosed.glb#Scene0".to_string(),
             "models/ground_pathSplit.glb#Scene0".to_string(),
             "models/ground_pathStraight.glb#Scene0".to_string(),
+            "models/ground_riverBendBank.glb#Scene0".to_string(),
+            "models/ground_riverCorner.glb#Scene0".to_string(),
+            "models/ground_riverCross.glb#Scene0".to_string(),
+            "models/ground_riverEndClosed.glb#Scene0".to_string(),
+            "models/ground_riverOpen.glb#Scene0".to_string(),
+            "models/ground_riverRocks.glb#Scene0".to_string(),
+            "models/ground_riverSide.glb#Scene0".to_string(),
+            "models/ground_riverSplit.glb#Scene0".to_string(),
+            "models/ground_riverStraight.glb#Scene0".to_string(),
         ];
 
         Self {

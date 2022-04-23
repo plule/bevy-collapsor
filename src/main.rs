@@ -121,7 +121,7 @@ fn setup(
                                     .insert_bundle(PickableBundle::default())
                                     .insert_bundle((
                                         Name::from(format!("tile proto {i}")),
-                                        Coordinates::new(2 * (i as i32), -1),
+                                        Coordinates::new(i as i32, -1),
                                         Palette::new(i),
                                     ))
                                     .with_children(|tile| {
