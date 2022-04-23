@@ -1,4 +1,4 @@
-use bevy::{input::mouse::MouseWheel, prelude::*};
+use bevy::{ecs::event::Events, input::mouse::MouseWheel, prelude::*, utils::HashMap};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
 use bevy_mod_picking::*;
 use num_derive::FromPrimitive;
@@ -13,11 +13,12 @@ fn main() {
             color: Color::WHITE,
             brightness: 1.0 / 5.0f32,
         })
+        .insert_resource(Events::<RulesNeedUpdateEvent>::default())
         .init_resource::<ModelAssets>()
         .init_resource::<SelectedTileProto>()
         .add_startup_system(setup)
         .register_inspectable::<Coordinates>()
-        .register_inspectable::<MapTileTag>()
+        .register_inspectable::<RuleTileTag>()
         .register_inspectable::<Palette>()
         .register_inspectable::<Orientation>()
         .register_inspectable::<TilePrototype>()
@@ -30,6 +31,7 @@ fn main() {
         .add_system(draw_map)
         .add_system_to_stage(CoreStage::PostUpdate, on_mouse_wheel)
         .add_system_to_stage(CoreStage::PostUpdate, on_pick_event)
+        .add_system_to_stage(CoreStage::PostUpdate, read_rules)
         .run();
 }
 
@@ -40,7 +42,7 @@ struct ModelAssets {
     up_cube_mat: Handle<StandardMaterial>,
 }
 
-#[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive)]
+#[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive, Hash, Eq, Debug)]
 enum Orientation {
     NORTH = 0,
     EST,
@@ -82,7 +84,7 @@ fn rotate_orientation() {
     assert!(orientation == Orientation::WEST);
 }
 
-#[derive(Default, Component, Inspectable, Clone, PartialEq)]
+#[derive(Default, Component, Inspectable, Clone, PartialEq, Hash, Eq, Debug)]
 struct TilePrototype {
     model_index: usize,
     orientation: Orientation,
@@ -115,7 +117,7 @@ struct SelectedTileProto {
 }
 
 #[derive(Component, Inspectable, Default)]
-struct MapTileTag;
+struct RuleTileTag;
 
 #[derive(Component, Inspectable)]
 struct Palette {
@@ -249,7 +251,7 @@ fn setup(
                                             Coordinates::new(x as i32, y as i32),
                                             OptionalTilePrototype::default(),
                                             DrawTile::default(),
-                                            MapTileTag::default(),
+                                            RuleTileTag::default(),
                                         ))
                                         .insert_bundle(PickableBundle::default());
                                 }
@@ -280,12 +282,13 @@ fn setup(
                             Coordinates::new(x as i32, y as i32),
                             OptionalTilePrototype::default(),
                             DrawTile::default(),
-                            MapTileTag::default(),
                         ))
                         .insert_bundle(PickableBundle::default());
                 }
             }
         });
+
+    commands.insert_resource(map);
 }
 
 fn pick_draw_tile(
@@ -350,6 +353,7 @@ fn pick_tile(
     mut query: Query<(&mut OptionalTilePrototype, &Hover)>,
     selected: Res<SelectedTileProto>,
     mouse_button_input: Res<Input<MouseButton>>,
+    mut event_writer: EventWriter<RulesNeedUpdateEvent>,
 ) {
     let new_tile;
     if mouse_button_input.pressed(MouseButton::Left) {
@@ -360,9 +364,82 @@ fn pick_tile(
         return;
     }
 
+    let mut changed = false;
     for (mut map_tile, hover) in query.iter_mut() {
         if hover.hovered() && *map_tile != new_tile {
             *map_tile = new_tile.clone();
+            changed = true;
+        }
+    }
+
+    if changed {
+        event_writer.send(RulesNeedUpdateEvent {});
+    }
+}
+
+struct RulesNeedUpdateEvent {}
+
+#[derive(Default, Debug)]
+struct Constraints {
+    pub top: Vec<TilePrototype>,
+    pub right: Vec<TilePrototype>,
+    pub down: Vec<TilePrototype>,
+    pub left: Vec<TilePrototype>,
+}
+
+/// Safe tile get from indexes
+fn get_tile_prototype(
+    map: &Vec<Vec<OptionalTilePrototype>>,
+    x: i32,
+    y: i32,
+) -> Option<TilePrototype> {
+    if x < 0 || y < 0 {
+        return None;
+    }
+    let line = map.get(x as usize)?;
+    let tile = line.get(y as usize)?;
+    tile.tile_prototype.clone()
+}
+
+fn read_rules(
+    mut event_reader: EventReader<RulesNeedUpdateEvent>,
+    mut map: ResMut<Map>,
+    query: Query<(&OptionalTilePrototype, &Coordinates), With<RuleTileTag>>,
+) {
+    if event_reader.is_empty() {
+        return;
+    }
+    for _ in event_reader.iter() {}
+    info!("Updating rules");
+
+    // Read the rule map
+    let mut rule_tiles = vec![vec![OptionalTilePrototype::default(); map.height]; map.width];
+    for (tile, coordinates) in query.iter() {
+        rule_tiles[coordinates.x as usize][coordinates.y as usize] = tile.clone();
+    }
+
+    // Store the rule connectivities as constraints
+    map.constraints = HashMap::<TilePrototype, Constraints>::new();
+    for x in 0..map.width {
+        for y in 0..map.height {
+            let tile = &rule_tiles[x][y];
+            let x = x as i32;
+            let y = y as i32;
+            if let Some(tile) = &tile.tile_prototype {
+                let constraints = map.constraints.entry(tile.clone()).or_default();
+                if let Some(top) = get_tile_prototype(&rule_tiles, x, y + 1) {
+                    constraints.top.push(top);
+                }
+                if let Some(right) = get_tile_prototype(&rule_tiles, x + 1, y) {
+                    constraints.right.push(right);
+                }
+                if let Some(down) = get_tile_prototype(&rule_tiles, x, y - 1) {
+                    constraints.down.push(down);
+                }
+                if let Some(left) = get_tile_prototype(&rule_tiles, x - 1, y) {
+                    constraints.left.push(left);
+                }
+            }
         }
     }
 }
@@ -416,6 +493,7 @@ struct Map {
     pub tile_models: Vec<String>,
     pub width: usize,
     pub height: usize,
+    pub constraints: HashMap<TilePrototype, Constraints>,
 }
 
 impl Map {
@@ -429,6 +507,7 @@ impl Map {
                 "models/ground_pathSplit.glb#Scene0".to_string(),
                 "models/ground_pathStraight.glb#Scene0".to_string(),
             ],
+            constraints: Default::default(),
             width,
             height,
         }
