@@ -178,15 +178,14 @@ fn setup(
 
     let pick_mesh = meshes.add(Mesh::from(shape::Plane { size: 1.0 }));
     let pick_mat = materials.add(StandardMaterial {
-        base_color: Color::rgba(1.0, 1.0, 1.0, 0.1),
-        alpha_mode: AlphaMode::Blend,
+        base_color: Color::WHITE,
         ..Default::default()
     });
 
     commands
         .spawn_bundle(PerspectiveCameraBundle {
-            transform: Transform::from_xyz(-10.0, 10.0, 8.0)
-                .looking_at(Vec3::new(4.0, 0.0, 8.0), Vec3::Y),
+            transform: Transform::from_xyz(0.0, 20.0, 20.0)
+                .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             ..default()
         })
         .insert_bundle(PickingCameraBundle::default())
@@ -196,6 +195,7 @@ fn setup(
                 .spawn_bundle(TransformBundle::from(
                     Transform::from_xyz(-1.1, -0.6, -1.6)
                         .with_rotation(Quat::from_euler(
+                            // TODO north appears on the left
                             EulerRot::YZX,
                             0.0,
                             90.0_f32.to_radians(),
@@ -265,6 +265,35 @@ fn setup(
                     }
                 });
         });
+
+    // Generated map
+    commands
+        .spawn_bundle(TransformBundle::from_transform(Transform::from_xyz(
+            -((map.width / 2) as f32),
+            0.0,
+            -((map.height / 2) as f32),
+        )))
+        .insert(Name::from("world_map"))
+        .with_children(|rule_map| {
+            for x in 0..map.width {
+                for y in 0..map.height {
+                    rule_map
+                        .spawn_bundle(PbrBundle {
+                            material: pick_mat.clone(),
+                            mesh: pick_mesh.clone(),
+                            ..Default::default()
+                        })
+                        .insert_bundle((
+                            Name::from(format!("{x}:{y}")),
+                            Coordinates::new(x as i32, y as i32),
+                            OptionalTilePrototype::default(),
+                            DrawTile::default(),
+                            MapTileTag::default(),
+                        ))
+                        .insert_bundle(PickableBundle::default());
+                }
+            }
+        });
 }
 
 fn pick_draw_tile(
@@ -308,7 +337,7 @@ fn draw_map(
                         tile.spawn_bundle(PbrBundle {
                             material: models.up_cube_mat.clone(),
                             mesh: models.up_cube_mesh.clone(),
-                            transform: Transform::from_translation(-Vec3::Z / 2.5), // TODO appears on the left
+                            transform: Transform::from_translation(-Vec3::Z / 2.5),
                             ..Default::default()
                         });
                     });
