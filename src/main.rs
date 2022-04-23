@@ -145,13 +145,6 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands
-        .spawn_bundle(PerspectiveCameraBundle {
-            transform: Transform::from_xyz(-10.0, 10.0, 8.0)
-                .looking_at(Vec3::new(4.0, 0.0, 8.0), Vec3::Y),
-            ..default()
-        })
-        .insert_bundle(PickingCameraBundle::default());
     const HALF_SIZE: f32 = 1.0;
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
@@ -185,60 +178,87 @@ fn setup(
         ..Default::default()
     });
 
-    // Palette
     commands
-        .spawn_bundle(TransformBundle::from(Transform::from_xyz(-2.0, 0.0, 0.0)))
-        .insert(Name::from("palette"))
-        .with_children(|palette| {
-            for i in 0..map.tile_models.len() {
-                let model = models.models[i].clone();
-                palette
-                    .spawn_bundle(PbrBundle {
-                        material: pick_mat.clone(),
-                        mesh: pick_mesh.clone(),
-                        ..Default::default()
-                    })
-                    .insert_bundle(PickableBundle::default())
-                    .insert_bundle((
-                        Name::from(format!("tile proto {i}")),
-                        Coordinates::new(0, 2 * (i as i32)),
-                        Palette::new(i),
-                    ))
-                    .with_children(|tile| {
-                        tile.spawn_bundle((
-                            Transform::from_xyz(0.0, 0.2, 0.0),
-                            GlobalTransform::default(),
+        .spawn_bundle(PerspectiveCameraBundle {
+            transform: Transform::from_xyz(-10.0, 10.0, 8.0)
+                .looking_at(Vec3::new(4.0, 0.0, 8.0), Vec3::Y),
+            ..default()
+        })
+        .insert_bundle(PickingCameraBundle::default())
+        .with_children(|camera| {
+            // Palette
+            camera
+                .spawn_bundle(TransformBundle::from(
+                    Transform::from_xyz(-1.1, -0.6, -1.6)
+                        .with_rotation(Quat::from_euler(
+                            EulerRot::YZX,
+                            0.0,
+                            90.0_f32.to_radians(),
+                            90.0_f32.to_radians(),
                         ))
-                        .with_children(|tile| {
-                            tile.spawn_scene(model);
-                        });
-                    });
-            }
-        });
+                        .with_scale(Vec3::new(0.05, 0.05, 0.05)),
+                ))
+                .insert(Name::from("palette"))
+                .with_children(|palette| {
+                    for i in 0..map.tile_models.len() {
+                        let model = models.models[i].clone();
+                        palette
+                            .spawn_bundle(PbrBundle {
+                                material: pick_mat.clone(),
+                                mesh: pick_mesh.clone(),
+                                ..Default::default()
+                            })
+                            .insert_bundle(PickableBundle::default())
+                            .insert_bundle((
+                                Name::from(format!("tile proto {i}")),
+                                Coordinates::new(0, 2 * (i as i32)),
+                                Palette::new(i),
+                            ))
+                            .with_children(|tile| {
+                                tile.spawn_bundle((
+                                    Transform::from_xyz(0.0, 0.2, 0.0),
+                                    GlobalTransform::default(),
+                                ))
+                                .with_children(|tile| {
+                                    tile.spawn_scene(model);
+                                });
+                            });
+                    }
+                });
 
-    // Rule map
-    commands
-        .spawn_bundle(TransformBundle::from(Transform::from_xyz(0.0, 0.0, 0.0)))
-        .insert(Name::from("rule_map"))
-        .with_children(|rule_map| {
-            for x in 0..map.width {
-                for y in 0..map.height {
-                    rule_map
-                        .spawn_bundle(PbrBundle {
-                            material: pick_mat.clone(),
-                            mesh: pick_mesh.clone(),
-                            ..Default::default()
-                        })
-                        .insert_bundle((
-                            Name::from(format!("{x}:{y}")),
-                            Coordinates::new(x as i32, y as i32),
-                            OptionalTilePrototype::default(),
-                            DrawTile::default(),
-                            MapTileTag::default(),
+            // Rule map
+            camera
+                .spawn_bundle(TransformBundle::from(
+                    Transform::from_xyz(-1.1, -0.5, -1.6)
+                        .with_rotation(Quat::from_euler(
+                            EulerRot::YZX,
+                            0.0,
+                            90.0_f32.to_radians(),
+                            90.0_f32.to_radians(),
                         ))
-                        .insert_bundle(PickableBundle::default());
-                }
-            }
+                        .with_scale(Vec3::new(0.05, 0.05, 0.05)),
+                ))
+                .insert(Name::from("rule_map"))
+                .with_children(|rule_map| {
+                    for x in 0..map.width {
+                        for y in 0..map.height {
+                            rule_map
+                                .spawn_bundle(PbrBundle {
+                                    material: pick_mat.clone(),
+                                    mesh: pick_mesh.clone(),
+                                    ..Default::default()
+                                })
+                                .insert_bundle((
+                                    Name::from(format!("{x}:{y}")),
+                                    Coordinates::new(x as i32, y as i32),
+                                    OptionalTilePrototype::default(),
+                                    DrawTile::default(),
+                                    MapTileTag::default(),
+                                ))
+                                .insert_bundle(PickableBundle::default());
+                        }
+                    }
+                });
         });
 }
 
@@ -354,7 +374,7 @@ fn animate_light_direction(
         transform.rotation = Quat::from_euler(
             EulerRot::ZYX,
             0.0,
-            time.seconds_since_startup() as f32 * std::f32::consts::TAU / 10.0,
+            time.seconds_since_startup() as f32 * std::f32::consts::TAU / 20.0,
             -std::f32::consts::FRAC_PI_4,
         );
     }
