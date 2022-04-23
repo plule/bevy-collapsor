@@ -1,11 +1,13 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::{ecs::event::Events, input::mouse::MouseWheel, prelude::*};
 use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
 use bevy_mod_picking::*;
+use std::hash::Hash;
 
 mod components;
 use components::*;
+use rand::prelude::SliceRandom;
 
 fn main() {
     App::new()
@@ -19,6 +21,7 @@ fn main() {
         .insert_resource(Events::<RulesNeedUpdateEvent>::default())
         .init_resource::<ModelAssets>()
         .init_resource::<SelectedTileProto>()
+        .init_resource::<Rules>()
         .add_startup_system(setup)
         .register_inspectable::<Coordinates>()
         .register_inspectable::<RuleTileTag>()
@@ -27,13 +30,16 @@ fn main() {
         .register_inspectable::<TilePrototype>()
         .register_inspectable::<SelectedTileProto>()
         .register_inspectable::<OptionalTilePrototype>()
+        .register_inspectable::<Connectivity>()
         .add_system(apply_coordinate)
         .add_system(animate_light_direction)
         .add_system(pick_tile)
         .add_system(pick_draw_tile)
+        .add_system(draw_rules)
         .add_system(draw_map)
+        .add_system(collapse)
         .add_system_to_stage(CoreStage::PostUpdate, on_mouse_wheel)
-        .add_system_to_stage(CoreStage::PostUpdate, on_pick_event)
+        .add_system_to_stage(CoreStage::PostUpdate, palette_select)
         .add_system_to_stage(CoreStage::PostUpdate, read_rules)
         .run();
 }
@@ -73,6 +79,10 @@ fn setup(
 
     models.up_cube_mesh = meshes.add(shape::Cube { size: 0.1 }.into());
     models.up_cube_mat = materials.add(Color::RED.into());
+    models.undecided_mesh = meshes.add(shape::Plane { size: 1.0 }.into());
+    models.undecided_mat = materials.add(Color::BLACK.into());
+    models.impossible_mesh = meshes.add(shape::Plane { size: 1.0 }.into());
+    models.impossible_mat = materials.add(Color::RED.into());
 
     let pick_mesh = meshes.add(Mesh::from(shape::Plane { size: 1.0 }));
     let pick_mat = materials.add(StandardMaterial {
@@ -157,6 +167,7 @@ fn setup(
         });
 
     // Generated map
+    let mut map_entities = vec![vec![Entity::from_raw(0); map.height]; map.width];
     commands
         .spawn_bundle(TransformBundle::from_transform(Transform::from_xyz(
             -((map.width / 2) as f32),
@@ -167,22 +178,33 @@ fn setup(
         .with_children(|rule_map| {
             for x in 0..map.width {
                 for y in 0..map.height {
-                    rule_map
-                        .spawn_bundle(PbrBundle {
-                            material: pick_mat.clone(),
-                            mesh: pick_mesh.clone(),
-                            ..Default::default()
-                        })
+                    let entity = rule_map
+                        .spawn_bundle(TransformBundle::default())
                         .insert_bundle((
                             Name::from(format!("{x}:{y}")),
                             Coordinates::new(x as i32, y as i32),
-                            OptionalTilePrototype::default(),
-                            DrawTile::default(),
+                            MultiTilePrototype::default(),
                         ))
-                        .insert_bundle(PickableBundle::default());
+                        .id();
+                    map_entities[x][y] = entity;
                 }
             }
         });
+
+    // Compute connectivity
+    for x in 0..map.width {
+        for y in 0..map.height {
+            let mut entity = commands.entity(map_entities[x][y]);
+            let x = x as i32;
+            let y = y as i32;
+            entity.insert(Connectivity {
+                top: get_tile_entity(&map_entities, x, y + 1),
+                right: get_tile_entity(&map_entities, x + 1, y),
+                down: get_tile_entity(&map_entities, x, y - 1),
+                left: get_tile_entity(&map_entities, x - 1, y),
+            });
+        }
+    }
 
     commands.insert_resource(map);
 }
@@ -207,7 +229,7 @@ fn pick_draw_tile(
     }
 }
 
-fn draw_map(
+fn draw_rules(
     query: Query<(Entity, &DrawTile), Changed<DrawTile>>,
     mut commands: Commands,
     models: Res<ModelAssets>,
@@ -234,6 +256,49 @@ fn draw_map(
                     });
             });
         };
+    }
+}
+
+fn draw_map(
+    query: Query<(Entity, &MultiTilePrototype), Changed<MultiTilePrototype>>,
+    mut commands: Commands,
+    models: Res<ModelAssets>,
+) {
+    for (entity, multi_tile) in query.iter() {
+        let mut entity = commands.entity(entity);
+        entity.despawn_descendants();
+
+        match multi_tile.tiles.len() {
+            0 => {
+                entity.with_children(|tile| {
+                    tile.spawn_bundle(PbrBundle {
+                        mesh: models.impossible_mesh.clone(),
+                        material: models.impossible_mat.clone(),
+                        ..Default::default()
+                    });
+                });
+            }
+            1 => {
+                let prototype = multi_tile.tiles.iter().next().unwrap();
+                let model = models.models[prototype.model_index].clone();
+                let transform = Transform::from_rotation(prototype.orientation.clone().into());
+                entity.with_children(|tile| {
+                    tile.spawn_bundle(TransformBundle::from_transform(transform))
+                        .with_children(|tile| {
+                            tile.spawn_scene(model);
+                        });
+                });
+            }
+            _ => {
+                entity.with_children(|tile| {
+                    tile.spawn_bundle(PbrBundle {
+                        mesh: models.undecided_mesh.clone(),
+                        material: models.undecided_mat.clone(),
+                        ..Default::default()
+                    });
+                });
+            }
+        }
     }
 }
 
@@ -287,9 +352,20 @@ fn get_tile_prototype(
     tile.tile_prototype.clone()
 }
 
+/// Safe tile get from indexes
+fn get_tile_entity(map: &Vec<Vec<Entity>>, x: i32, y: i32) -> Option<Entity> {
+    if x < 0 || y < 0 {
+        return None;
+    }
+    let line = map.get(x as usize)?;
+    let tile = line.get(y as usize)?;
+    Some(tile.clone())
+}
+
 fn read_rules(
     mut event_reader: EventReader<RulesNeedUpdateEvent>,
-    mut map: ResMut<Map>,
+    map: Res<Map>,
+    mut rules: ResMut<Rules>,
     query: Query<(&OptionalTilePrototype, &Coordinates), With<RuleTileTag>>,
 ) {
     if event_reader.is_empty() {
@@ -305,46 +381,116 @@ fn read_rules(
     }
 
     // Store the rule connectivities as constraints
-    map.constraints = HashMap::<TilePrototype, Constraints>::new();
+    rules.constraints = HashMap::<TilePrototype, Constraints>::new();
     for x in 0..map.width {
         for y in 0..map.height {
             let tile = &rule_tiles[x][y];
             let x = x as i32;
             let y = y as i32;
             if let Some(tile) = &tile.tile_prototype {
-                let constraints = map.constraints.entry(tile.clone()).or_default();
+                let constraints = rules.constraints.entry(tile.clone()).or_default();
                 if let Some(top) = get_tile_prototype(&rule_tiles, x, y + 1) {
-                    constraints.top.push(top);
+                    constraints.top.insert(top);
                 }
                 if let Some(right) = get_tile_prototype(&rule_tiles, x + 1, y) {
-                    constraints.right.push(right);
+                    constraints.right.insert(right);
                 }
                 if let Some(down) = get_tile_prototype(&rule_tiles, x, y - 1) {
-                    constraints.down.push(down);
+                    constraints.down.insert(down);
                 }
                 if let Some(left) = get_tile_prototype(&rule_tiles, x - 1, y) {
-                    constraints.left.push(left);
+                    constraints.left.insert(left);
                 }
             }
         }
     }
 }
 
-fn on_pick_event(
+fn intersection<T: Eq + Hash>(a: HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
+    a.into_iter().filter(|e| b.contains(e)).collect()
+}
+
+fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype, &Connectivity)>) {
+    let mut rng = rand::thread_rng();
+
+    if rules.constraints.is_empty() {
+        return;
+    }
+
+    // Reset to every possibilities on rule change
+    if rules.is_changed() {
+        let mut possible_tiles = HashSet::new();
+        for tile in rules.constraints.keys() {
+            possible_tiles.insert(tile.clone());
+        }
+        for (_, mut multi_tile_prototype, _) in query.iter_mut() {
+            multi_tile_prototype.tiles = possible_tiles.clone();
+        }
+    }
+
+    // Find the smallest > 1 entropy
+    let mut min_entropy = usize::MAX;
+    let mut min_entropy_entity = Option::<Entity>::default();
+    for (entity, multi_line_prototype, _) in query.iter() {
+        let entropy = multi_line_prototype.tiles.len();
+        if entropy < min_entropy && entropy > 1 {
+            min_entropy = entropy;
+            min_entropy_entity = Some(entity);
+        }
+    }
+
+    if let Some(min_entropy_entity) = min_entropy_entity {
+        // Observe the tile with the smallest entropy
+        let (connectivity, constraints) = {
+            let query: &mut Query<(Entity, &mut MultiTilePrototype, &Connectivity)> = &mut query;
+            let (_, mut multi_tile_prototype, connectivity) =
+                query.get_mut(min_entropy_entity).unwrap();
+            let tile_vec: Vec<&TilePrototype> = multi_tile_prototype.tiles.iter().collect();
+            let observed = *tile_vec.choose(&mut rng).unwrap().clone();
+            multi_tile_prototype.tiles.clear();
+            multi_tile_prototype.tiles.insert(observed.clone());
+
+            let constraints = rules.constraints.get(&observed).unwrap();
+            (connectivity.clone(), constraints.clone())
+        };
+
+        // Propagate to its neighbours
+        if let Some(e) = connectivity.top {
+            let (_, mut tiles, _) = query.get_mut(e).unwrap();
+            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.top);
+        }
+
+        if let Some(e) = connectivity.right {
+            let (_, mut tiles, _) = query.get_mut(e).unwrap();
+            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.right);
+        }
+
+        if let Some(e) = connectivity.down {
+            let (_, mut tiles, _) = query.get_mut(e).unwrap();
+            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.down);
+        }
+
+        if let Some(e) = connectivity.left {
+            let (_, mut tiles, _) = query.get_mut(e).unwrap();
+            tiles.tiles = intersection(tiles.tiles.clone(), &constraints.left);
+        }
+    }
+}
+
+fn palette_select(
     mut events: EventReader<PickingEvent>,
     mut selected: ResMut<SelectedTileProto>,
     palette_query: Query<&Palette>,
 ) {
     for event in events.iter() {
         match event {
-            PickingEvent::Selection(_) => (),
-            PickingEvent::Hover(_) => (),
             PickingEvent::Clicked(e) => {
                 match palette_query.get(*e) {
                     Ok(e) => selected.tile_prototype = OptionalTilePrototype::from_index(e.index),
                     Err(_) => (),
                 };
             }
+            _ => (),
         }
     }
 }

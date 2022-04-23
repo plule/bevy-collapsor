@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
@@ -10,6 +10,10 @@ pub struct ModelAssets {
     pub models: Vec<Handle<Scene>>,
     pub up_cube_mesh: Handle<Mesh>,
     pub up_cube_mat: Handle<StandardMaterial>,
+    pub undecided_mesh: Handle<Mesh>,
+    pub undecided_mat: Handle<StandardMaterial>,
+    pub impossible_mesh: Handle<Mesh>,
+    pub impossible_mat: Handle<StandardMaterial>,
 }
 
 #[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive, Hash, Eq, Debug)]
@@ -44,7 +48,7 @@ impl Orientation {
     }
 }
 
-#[derive(Default, Component, Inspectable, Clone, PartialEq, Hash, Eq, Debug)]
+#[derive(Default, Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct TilePrototype {
     pub model_index: usize,
     pub orientation: Orientation,
@@ -53,6 +57,11 @@ pub struct TilePrototype {
 #[derive(Default, Component, Inspectable, Clone, PartialEq)]
 pub struct OptionalTilePrototype {
     pub tile_prototype: Option<TilePrototype>,
+}
+
+#[derive(Default, Component, Clone, PartialEq, Eq, Debug)]
+pub struct MultiTilePrototype {
+    pub tiles: HashSet<TilePrototype>,
 }
 
 #[derive(Default, Component, Inspectable, Clone, PartialEq)]
@@ -104,33 +113,61 @@ impl Coordinates {
 
 pub struct RulesNeedUpdateEvent {}
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Constraints {
-    pub top: Vec<TilePrototype>,
-    pub right: Vec<TilePrototype>,
-    pub down: Vec<TilePrototype>,
-    pub left: Vec<TilePrototype>,
+    pub top: HashSet<TilePrototype>,
+    pub right: HashSet<TilePrototype>,
+    pub down: HashSet<TilePrototype>,
+    pub left: HashSet<TilePrototype>,
+}
+
+#[derive(Component, Default, Inspectable, Clone)]
+pub struct Connectivity {
+    pub top: Option<Entity>,
+    pub right: Option<Entity>,
+    pub down: Option<Entity>,
+    pub left: Option<Entity>,
 }
 
 pub struct Map {
     pub tile_models: Vec<String>,
     pub width: usize,
     pub height: usize,
+}
+
+#[derive(Default, Debug)]
+pub struct Rules {
     pub constraints: HashMap<TilePrototype, Constraints>,
 }
 
 impl Map {
     pub fn new(width: usize, height: usize) -> Self {
+        let tile_models = vec![
+            "models/ground_grass.glb#Scene0".to_string(),
+            "models/ground_pathBend.glb#Scene0".to_string(),
+            "models/ground_pathCross.glb#Scene0".to_string(),
+            "models/ground_pathEndClosed.glb#Scene0".to_string(),
+            "models/ground_pathSplit.glb#Scene0".to_string(),
+            "models/ground_pathStraight.glb#Scene0".to_string(),
+        ];
+        let mut tile_prototypes = HashSet::new();
+
+        for orientation in [
+            Orientation::NORTH,
+            Orientation::EST,
+            Orientation::SOUTH,
+            Orientation::WEST,
+        ] {
+            for model_index in 0..tile_models.len() {
+                tile_prototypes.insert(TilePrototype {
+                    model_index,
+                    orientation,
+                });
+            }
+        }
+
         Self {
-            tile_models: vec![
-                "models/ground_grass.glb#Scene0".to_string(),
-                "models/ground_pathBend.glb#Scene0".to_string(),
-                "models/ground_pathCross.glb#Scene0".to_string(),
-                "models/ground_pathEndClosed.glb#Scene0".to_string(),
-                "models/ground_pathSplit.glb#Scene0".to_string(),
-                "models/ground_pathStraight.glb#Scene0".to_string(),
-            ],
-            constraints: Default::default(),
+            tile_models,
             width,
             height,
         }
