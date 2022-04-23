@@ -221,6 +221,8 @@ dependencies = [
  "bevy",
  "bevy-inspector-egui",
  "bevy_mod_picking",
+ "num-derive",
+ "num-traits",
  "rand",
 ]
 

@@ -10,6 +10,8 @@ bevy = "0.7.0"
 bevy-inspector-egui = "0.10.0"
 bevy_mod_picking = "0.6"
 rand = "0.8.5"
+num-traits = "0.2"
+num-derive = "0.3.3"
 
 # Enable only a small amount of optimization in debug mode
 [profile.dev]

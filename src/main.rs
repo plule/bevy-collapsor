@@ -1,6 +1,8 @@
-use bevy::prelude::*;
+use bevy::{input::mouse::MouseWheel, prelude::*};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
 use bevy_mod_picking::*;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 
 fn main() {
     App::new()
@@ -15,11 +17,17 @@ fn main() {
         .init_resource::<SelectedTileProto>()
         .add_startup_system(setup)
         .register_inspectable::<Coordinates>()
-        .register_inspectable::<MapTile>()
+        .register_inspectable::<MapTileTag>()
         .register_inspectable::<Palette>()
+        .register_inspectable::<Orientation>()
+        .register_inspectable::<TilePrototype>()
+        .register_inspectable::<SelectedTileProto>()
+        .register_inspectable::<OptionalTilePrototype>()
         .add_system(apply_coordinate)
         .add_system(animate_light_direction)
+        .add_system(pick_draw_tile)
         .add_system(draw_map)
+        .add_system_to_stage(CoreStage::PostUpdate, on_mouse_wheel)
         .add_system_to_stage(CoreStage::PostUpdate, on_pick_event)
         .run();
 }
@@ -29,10 +37,82 @@ struct ModelAssets {
     models: Vec<Handle<Scene>>,
 }
 
-#[derive(Default)]
-struct SelectedTileProto {
-    index: Option<usize>,
+#[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive)]
+enum Orientation {
+    NORTH = 0,
+    EST,
+    SOUTH,
+    WEST,
 }
+
+impl Default for Orientation {
+    fn default() -> Self {
+        Orientation::NORTH
+    }
+}
+
+impl From<Orientation> for Quat {
+    fn from(orientation: Orientation) -> Self {
+        let angle = match orientation {
+            Orientation::NORTH => 0.,
+            Orientation::EST => -90.0_f32.to_radians(),
+            Orientation::SOUTH => -180.0_f32.to_radians(),
+            Orientation::WEST => -270.0_f32.to_radians(),
+        };
+        Quat::from_rotation_y(angle)
+    }
+}
+
+impl Orientation {
+    fn rotate(&mut self, amount: i32) {
+        *self = FromPrimitive::from_i32(((*self as i32) + amount).rem_euclid(4)).unwrap();
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn rotate_orientation() {
+    let mut orientation = Orientation::NORTH;
+    orientation.rotate(-2);
+    assert!(orientation == Orientation::SOUTH);
+    orientation.rotate(1);
+    assert!(orientation == Orientation::WEST);
+}
+
+#[derive(Default, Component, Inspectable, Clone, PartialEq)]
+struct TilePrototype {
+    model_index: usize,
+    orientation: Orientation,
+}
+
+#[derive(Default, Component, Inspectable, Clone, PartialEq)]
+struct OptionalTilePrototype {
+    tile_prototype: Option<TilePrototype>,
+}
+
+#[derive(Default, Component, Inspectable, Clone, PartialEq)]
+struct DrawTile {
+    tile: OptionalTilePrototype,
+}
+
+impl OptionalTilePrototype {
+    pub fn from_index(index: usize) -> OptionalTilePrototype {
+        OptionalTilePrototype {
+            tile_prototype: Some(TilePrototype {
+                model_index: index,
+                ..Default::default()
+            }),
+        }
+    }
+}
+
+#[derive(Default, Inspectable)]
+struct SelectedTileProto {
+    tile_prototype: OptionalTilePrototype,
+}
+
+#[derive(Component, Inspectable, Default)]
+struct MapTileTag;
 
 #[derive(Component, Inspectable)]
 struct Palette {
@@ -42,6 +122,18 @@ struct Palette {
 impl Palette {
     fn new(index: usize) -> Self {
         Self { index }
+    }
+}
+
+#[derive(Component, Inspectable, Default)]
+struct Coordinates {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Coordinates {
+    fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
     }
 }
 
@@ -139,7 +231,9 @@ fn setup(
                         .insert_bundle((
                             Name::from(format!("{x}:{y}")),
                             Coordinates::new(x as i32, y as i32),
-                            MapTile::default(),
+                            OptionalTilePrototype::default(),
+                            DrawTile::default(),
+                            MapTileTag::default(),
                         ))
                         .insert_bundle(PickableBundle::default());
                 }
@@ -147,31 +241,45 @@ fn setup(
         });
 }
 
-fn draw_map(
-    query: Query<(Entity, &MapTile, &Hover), Or<(Changed<MapTile>, Changed<Hover>)>>,
-    mut commands: Commands,
-    models: Res<ModelAssets>,
+fn pick_draw_tile(
+    mut query: Query<(&mut DrawTile, &OptionalTilePrototype, &Hover)>,
     selected: Res<SelectedTileProto>,
 ) {
-    for (entity, map_tile, hover) in query.iter() {
+    for (mut draw_tile, map_tile, hover) in query.iter_mut() {
+        match hover.hovered() {
+            true => {
+                if draw_tile.tile != selected.tile_prototype {
+                    draw_tile.tile = selected.tile_prototype.clone();
+                }
+            }
+            false => {
+                if draw_tile.tile != *map_tile {
+                    draw_tile.tile = map_tile.clone();
+                }
+            }
+        }
+    }
+}
+
+fn draw_map(
+    query: Query<(Entity, &DrawTile), Changed<DrawTile>>,
+    mut commands: Commands,
+    models: Res<ModelAssets>,
+) {
+    for (entity, draw_tile) in query.iter() {
         let mut entity = commands.entity(entity);
         entity.despawn_descendants();
 
-        let draw_index = match hover.hovered() {
-            true => selected.index,
-            false => map_tile.tile_prototype,
-        };
-
-        if let Some(index) = draw_index {
+        if let Some(tile_prototype) = &draw_tile.tile.tile_prototype {
             entity.with_children(|tile| {
-                let model = models.models[index].clone();
-                tile.spawn_bundle((
-                    Transform::from_xyz(0.0, 0.2, 0.0),
-                    GlobalTransform::default(),
-                ))
-                .with_children(|tile| {
-                    tile.spawn_scene(model);
-                });
+                let model = models.models[tile_prototype.model_index].clone();
+                let transform = Transform::from_rotation(tile_prototype.orientation.clone().into())
+                    .with_translation(Vec3::new(0.0, 0.2, 0.0));
+
+                tile.spawn_bundle((transform, GlobalTransform::default()))
+                    .with_children(|tile| {
+                        tile.spawn_scene(model);
+                    });
             });
         };
     }
@@ -189,7 +297,7 @@ fn on_pick_event(
     mut events: EventReader<PickingEvent>,
     mut selected: ResMut<SelectedTileProto>,
     palette_query: Query<&Palette>,
-    mut rule_map_query: Query<&mut MapTile>,
+    mut tile_prototype_query: Query<&mut OptionalTilePrototype>,
 ) {
     for event in events.iter() {
         match event {
@@ -197,14 +305,26 @@ fn on_pick_event(
             PickingEvent::Hover(_) => (),
             PickingEvent::Clicked(e) => {
                 match palette_query.get(*e) {
-                    Ok(e) => selected.index = Some(e.index),
+                    Ok(e) => selected.tile_prototype = OptionalTilePrototype::from_index(e.index),
                     Err(_) => (),
                 };
-                match rule_map_query.get_mut(*e) {
-                    Ok(mut e) => e.tile_prototype = selected.index,
+                match tile_prototype_query.get_mut(*e) {
+                    Ok(mut e) => *e = selected.tile_prototype.clone(),
                     Err(_) => (),
                 };
             }
+        }
+    }
+}
+
+fn on_mouse_wheel(
+    mut mouse_wheel_events: EventReader<MouseWheel>,
+    mut selected_tile: ResMut<SelectedTileProto>,
+) {
+    let selected_tile = &mut selected_tile.tile_prototype;
+    if let Some(selected_tile) = &mut selected_tile.tile_prototype {
+        for event in mouse_wheel_events.iter() {
+            selected_tile.orientation.rotate(event.y as i32);
         }
     }
 }
@@ -229,11 +349,6 @@ struct Map {
     pub height: usize,
 }
 
-#[derive(Component, Inspectable, Default)]
-struct MapTile {
-    pub tile_prototype: Option<usize>,
-}
-
 impl Map {
     fn new(width: usize, height: usize) -> Self {
         Self {
@@ -249,21 +364,4 @@ impl Map {
             height,
         }
     }
-}
-
-#[derive(Component, Inspectable, Default)]
-struct Coordinates {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Coordinates {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-}
-
-#[derive(Component, Inspectable)]
-struct TileType {
-    file: String,
 }
