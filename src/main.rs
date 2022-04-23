@@ -194,22 +194,14 @@ fn setup(
     for x in 0..map.width {
         for y in 0..map.height {
             let mut entity = commands.entity(map_entities[x][y]);
-            let x = x as i32;
-            let y = y as i32;
+            let coord = Coordinates::new(x as i32, y as i32);
             let mut connectivity = HashMap::new();
-            if let Some(e) = get_tile_entity(&map_entities, x, y + 1) {
-                connectivity.insert(Orientation::NORTH, e);
+            for orientation in Orientation::values() {
+                let neighbour_coords = orientation.offset(&coord);
+                if let Some(e) = get_tile_entity(&map_entities, &neighbour_coords) {
+                    connectivity.insert(orientation, e);
+                }
             }
-            if let Some(e) = get_tile_entity(&map_entities, x + 1, y) {
-                connectivity.insert(Orientation::EST, e);
-            }
-            if let Some(e) = get_tile_entity(&map_entities, x, y - 1) {
-                connectivity.insert(Orientation::SOUTH, e);
-            }
-            if let Some(e) = get_tile_entity(&map_entities, x - 1, y) {
-                connectivity.insert(Orientation::WEST, e);
-            }
-
             entity.insert(Connectivity { connectivity });
         }
     }
@@ -349,24 +341,23 @@ fn pick_tile(
 /// Safe tile get from indexes
 fn get_tile_prototype(
     map: &Vec<Vec<OptionalTilePrototype>>,
-    x: i32,
-    y: i32,
+    coordinates: &Coordinates,
 ) -> Option<TilePrototype> {
-    if x < 0 || y < 0 {
+    if coordinates.x < 0 || coordinates.y < 0 {
         return None;
     }
-    let line = map.get(x as usize)?;
-    let tile = line.get(y as usize)?;
+    let line = map.get(coordinates.x as usize)?;
+    let tile = line.get(coordinates.y as usize)?;
     tile.tile_prototype.clone()
 }
 
 /// Safe tile get from indexes
-fn get_tile_entity(map: &Vec<Vec<Entity>>, x: i32, y: i32) -> Option<Entity> {
-    if x < 0 || y < 0 {
+fn get_tile_entity(map: &Vec<Vec<Entity>>, coordinates: &Coordinates) -> Option<Entity> {
+    if coordinates.x < 0 || coordinates.y < 0 {
         return None;
     }
-    let line = map.get(x as usize)?;
-    let tile = line.get(y as usize)?;
+    let line = map.get(coordinates.x as usize)?;
+    let tile = line.get(coordinates.y as usize)?;
     Some(tile.clone())
 }
 
@@ -393,37 +384,23 @@ fn read_rules(
     for x in 0..map.width {
         for y in 0..map.height {
             let tile = &rule_tiles[x][y];
-            let x = x as i32;
-            let y = y as i32;
+            let coords = Coordinates::new(x as i32, y as i32);
             if let Some(tile) = &tile.tile_prototype {
                 let constraints = &mut rules
                     .constraints
                     .entry(tile.clone())
                     .or_default()
                     .constraints;
-                if let Some(top) = get_tile_prototype(&rule_tiles, x, y + 1) {
-                    constraints
-                        .entry(Orientation::NORTH)
-                        .or_default()
-                        .insert(top);
-                }
-                if let Some(right) = get_tile_prototype(&rule_tiles, x + 1, y) {
-                    constraints
-                        .entry(Orientation::EST)
-                        .or_default()
-                        .insert(right);
-                }
-                if let Some(down) = get_tile_prototype(&rule_tiles, x, y - 1) {
-                    constraints
-                        .entry(Orientation::SOUTH)
-                        .or_default()
-                        .insert(down);
-                }
-                if let Some(left) = get_tile_prototype(&rule_tiles, x - 1, y) {
-                    constraints
-                        .entry(Orientation::WEST)
-                        .or_default()
-                        .insert(left);
+
+                for orientation in Orientation::values() {
+                    let neighbour_coords = orientation.offset(&coords);
+                    let neighbour_tile = get_tile_prototype(&rule_tiles, &neighbour_coords);
+                    if let Some(neighbour_tile) = neighbour_tile {
+                        constraints
+                            .entry(orientation)
+                            .or_default()
+                            .insert(neighbour_tile);
+                    }
                 }
             }
         }
@@ -478,16 +455,11 @@ fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut MultiTilePrototype
             (connectivity.clone(), constraints.clone())
         };
 
-        let mut connectivity = connectivity.connectivity;
+        let connectivity = connectivity.connectivity;
         let constraints = constraints.constraints;
 
         // Propagate to its neighbours
-        for orientation in [
-            Orientation::NORTH,
-            Orientation::EST,
-            Orientation::SOUTH,
-            Orientation::WEST,
-        ] {
+        for orientation in Orientation::values() {
             if let Some(e) = connectivity.get(&orientation) {
                 let (_, mut tiles, _) = query.get_mut(*e).unwrap();
                 let allowed = constraints.get(&orientation);

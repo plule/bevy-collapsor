@@ -30,17 +30,6 @@ impl Default for Orientation {
     }
 }
 
-impl From<Orientation> for Coordinates {
-    fn from(orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::NORTH => Coordinates::new(0, 1),
-            Orientation::EST => Coordinates::new(1, 0),
-            Orientation::SOUTH => Coordinates::new(0, -1),
-            Orientation::WEST => Coordinates::new(-1, 0),
-        }
-    }
-}
-
 impl From<Orientation> for Quat {
     fn from(orientation: Orientation) -> Self {
         let angle = match orientation {
@@ -54,8 +43,32 @@ impl From<Orientation> for Quat {
 }
 
 impl Orientation {
+    pub fn values() -> [Orientation; 4] {
+        [
+            Orientation::NORTH,
+            Orientation::EST,
+            Orientation::SOUTH,
+            Orientation::WEST,
+        ]
+    }
+
     pub fn rotate(&mut self, amount: i32) {
         *self = FromPrimitive::from_i32(((*self as i32) + amount).rem_euclid(4)).unwrap();
+    }
+
+    pub fn rotated(&self, amount: i32) -> Self {
+        let mut ret = self.clone();
+        ret.rotate(amount);
+        ret
+    }
+
+    pub fn offset(&self, coordinate: &Coordinates) -> Coordinates {
+        match self {
+            Orientation::NORTH => Coordinates::new(coordinate.x, coordinate.y + 1),
+            Orientation::EST => Coordinates::new(coordinate.x + 1, coordinate.y),
+            Orientation::SOUTH => Coordinates::new(coordinate.x, coordinate.y - 1),
+            Orientation::WEST => Coordinates::new(coordinate.x - 1, coordinate.y),
+        }
     }
 }
 
@@ -155,21 +168,6 @@ impl Map {
             "models/ground_pathSplit.glb#Scene0".to_string(),
             "models/ground_pathStraight.glb#Scene0".to_string(),
         ];
-        let mut tile_prototypes = HashSet::new();
-
-        for orientation in [
-            Orientation::NORTH,
-            Orientation::EST,
-            Orientation::SOUTH,
-            Orientation::WEST,
-        ] {
-            for model_index in 0..tile_models.len() {
-                tile_prototypes.insert(TilePrototype {
-                    model_index,
-                    orientation,
-                });
-            }
-        }
 
         Self {
             tile_models,
