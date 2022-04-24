@@ -5,15 +5,47 @@ use bevy_inspector_egui::Inspectable;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
-#[derive(Default)]
 pub struct ModelAssets {
-    pub models: Vec<Handle<Scene>>,
     pub up_cube_mesh: Handle<Mesh>,
     pub up_cube_mat: Handle<StandardMaterial>,
     pub undecided_mesh: Handle<Mesh>,
     pub undecided_mat: Handle<StandardMaterial>,
     pub impossible_mesh: Handle<Mesh>,
     pub impossible_mat: Handle<StandardMaterial>,
+    pub pick_mesh: Handle<Mesh>,
+    pub pick_mat: Handle<StandardMaterial>,
+}
+
+impl FromWorld for ModelAssets {
+    fn from_world(world: &mut World) -> Self {
+        let mut meshes = world.get_resource_mut::<Assets<Mesh>>().unwrap();
+        let up_cube_mesh = meshes.add(shape::Cube { size: 0.1 }.into());
+        let undecided_mesh = meshes.add(shape::Plane { size: 1.0 }.into());
+        let impossible_mesh = meshes.add(shape::Plane { size: 1.0 }.into());
+        let pick_mesh = meshes.add(Mesh::from(shape::Plane { size: 1.0 }));
+
+        let mut materials = world
+            .get_resource_mut::<Assets<StandardMaterial>>()
+            .unwrap();
+        let up_cube_mat = materials.add(Color::RED.into());
+        let undecided_mat = materials.add(Color::BLACK.into());
+        let impossible_mat = materials.add(Color::RED.into());
+        let pick_mat = materials.add(StandardMaterial {
+            base_color: Color::WHITE,
+            ..Default::default()
+        });
+
+        Self {
+            up_cube_mesh,
+            up_cube_mat,
+            undecided_mesh,
+            undecided_mat,
+            impossible_mesh,
+            impossible_mat,
+            pick_mesh,
+            pick_mat,
+        }
+    }
 }
 
 /// Variation of the palette elements that are equivalents
@@ -86,105 +118,124 @@ impl Orientation {
     }
 }
 
-#[derive(Default, Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug)]
+#[derive(Default, Component, Clone, PartialEq, Hash, Eq, Debug)]
 pub struct TilePrototype {
-    pub model_index: usize,
-    pub orientation: Orientation,
+    pub index: usize,
+    pub model: Handle<Scene>,
     pub equivalences: Equivalences,
 }
 
 impl TilePrototype {
-    pub fn new(model_index: usize, orientation: Orientation, equivalences: Equivalences) -> Self {
+    pub fn new(index: usize, model: Handle<Scene>, equivalences: Equivalences) -> Self {
         Self {
-            model_index,
-            orientation,
+            index,
+            model,
             equivalences,
         }
     }
 
-    pub fn rotate(&mut self, amount: i32) {
-        self.orientation.rotate(amount);
-
-        // Take in account the equivalences. There is likely a smart way to do that but oh well
-        self.orientation = match self.equivalences {
-            Equivalences::None => self.orientation,
-            Equivalences::HalfTurn => match self.orientation {
-                Orientation::North => Orientation::North,
-                Orientation::East => Orientation::East,
-                Orientation::South => Orientation::North,
-                Orientation::West => Orientation::East,
-            },
-            Equivalences::QuarterTurn => Orientation::North,
-        }
-    }
-
-    pub fn rotated(&self, amount: i32) -> Self {
-        let mut ret = self.clone();
-        ret.rotate(amount);
-        ret
-    }
-
-    /// Get the list of rotations, skipping the equivalences
-    pub fn rotations(&self) -> Vec<i32> {
-        match self.equivalences {
+    pub fn equivalent_directions(&self, direction: Orientation) -> Vec<Orientation> {
+        let equivalent_rotations = match self.equivalences {
             Equivalences::None => vec![0],
             Equivalences::HalfTurn => vec![0, 2],
-            Equivalences::QuarterTurn => vec![0, 1, 2, 3],
-        }
-    }
-
-    /// Get all the tile prototypes equivalent.
-    pub fn equivalences(&self) -> Vec<Self> {
-        let rotations = match self.equivalences {
-            Equivalences::None => vec![0],
-            Equivalences::HalfTurn => vec![0, 2],
-            Equivalences::QuarterTurn => vec![0, 1, 2, 3],
+            Equivalences::QuarterTurn => vec![0, 1, 2, 3, 4],
         };
 
-        rotations
+        equivalent_rotations
             .iter()
-            .map(|rotation| self.rotated(*rotation))
+            .map(|rotation| direction.rotated(*rotation))
             .collect()
+    }
+
+    pub fn available_rotations(&self) -> Vec<i32> {
+        match self.equivalences {
+            Equivalences::None => vec![0, 1, 2, 3],
+            Equivalences::HalfTurn => vec![0, 1],
+            Equivalences::QuarterTurn => vec![0],
+        }
+    }
+
+    pub fn make_tile(&self, orientation: Orientation) -> Tile {
+        Tile::new(self.index, orientation)
+    }
+
+    pub fn make_rotated_tile(&self, original_orientation: Orientation, rotation: i32) -> Tile {
+        let orientation = original_orientation.rotated(rotation);
+        let orientation = match self.equivalences {
+            Equivalences::None => orientation,
+            Equivalences::HalfTurn => match orientation {
+                Orientation::North | Orientation::South => Orientation::North,
+                Orientation::East | Orientation::West => Orientation::East,
+            },
+            Equivalences::QuarterTurn => Orientation::North,
+        };
+        self.make_tile(orientation)
+    }
+}
+
+#[derive(Default, Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug)]
+pub struct Tile {
+    pub prototype_index: usize,
+    pub orientation: Orientation,
+}
+
+impl Tile {
+    pub fn new(prototype_index: usize, orientation: Orientation) -> Self {
+        Self {
+            prototype_index,
+            orientation,
+        }
     }
 }
 
 #[derive(Default, Component, Inspectable, Clone, PartialEq)]
-pub struct OptionalTilePrototype {
-    pub tile_prototype: Option<TilePrototype>,
+pub struct OptionalTile {
+    pub tile: Option<Tile>,
 }
 
+impl OptionalTile {
+    pub fn new(tile: Option<Tile>) -> Self {
+        Self { tile }
+    }
+}
+
+/// Superposition of possible states
+///
+/// If the tiles size is 1, then it's resolved.
+/// If it's zero, then it's impossible.
 #[derive(Default, Component, Clone, PartialEq, Eq, Debug)]
-pub struct MultiTilePrototype {
-    pub tiles: HashSet<TilePrototype>,
+pub struct TileSuperposition {
+    pub tiles: HashSet<Tile>,
 }
 
 #[derive(Default, Component, Inspectable, Clone, PartialEq)]
 pub struct DrawTile {
-    pub tile: OptionalTilePrototype,
+    pub tile: OptionalTile,
 }
 
-impl OptionalTilePrototype {
-    pub fn from_index(index: usize) -> OptionalTilePrototype {
-        OptionalTilePrototype {
-            tile_prototype: Some(TilePrototype {
-                model_index: index,
-                ..Default::default()
-            }),
-        }
+impl From<Tile> for OptionalTile {
+    fn from(tile: Tile) -> Self {
+        Self { tile: Some(tile) }
     }
 }
 
-impl From<TilePrototype> for OptionalTilePrototype {
-    fn from(prototype: TilePrototype) -> Self {
-        Self {
-            tile_prototype: Some(prototype),
-        }
-    }
+#[derive(Default)]
+pub struct TileSelection {
+    pub rotation: i32,
+    pub prototype: Option<TilePrototype>,
 }
 
-#[derive(Default, Inspectable)]
-pub struct SelectedTileProto {
-    pub tile_prototype: OptionalTilePrototype,
+impl TileSelection {
+    pub fn make_tile(&self) -> Option<Tile> {
+        match &self.prototype {
+            Some(prototype) => Some(
+                prototype
+                    .clone()
+                    .make_rotated_tile(Orientation::North, self.rotation),
+            ),
+            None => None,
+        }
+    }
 }
 
 #[derive(Component, Inspectable, Default)]
@@ -209,7 +260,7 @@ pub struct RulesNeedUpdateEvent {}
 
 #[derive(Default, Debug, Clone)]
 pub struct Constraints {
-    pub constraints: HashMap<Orientation, HashSet<TilePrototype>>,
+    pub constraints: HashMap<Orientation, HashSet<Tile>>,
 }
 
 #[derive(Component, Default, Clone)]
@@ -217,33 +268,17 @@ pub struct Connectivity {
     pub connectivity: HashMap<Orientation, Entity>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Rules {
-    pub constraints: HashMap<TilePrototype, Constraints>,
-}
-
-pub struct PaletteElement {
-    pub tile_model: String,
-    pub equivalences: Equivalences,
-}
-
-impl PaletteElement {
-    pub fn new(tile_model: &str, symmetry: Equivalences) -> Self {
-        Self {
-            tile_model: tile_model.to_string(),
-            equivalences: symmetry,
-        }
-    }
-}
-
-pub struct Map {
-    pub palette: Vec<PaletteElement>,
     pub width: usize,
     pub height: usize,
+    pub prototypes: Vec<TilePrototype>,
+    pub constraints: HashMap<Tile, Constraints>,
 }
 
-impl Map {
-    pub fn new(width: usize, height: usize) -> Self {
+impl FromWorld for Rules {
+    fn from_world(world: &mut World) -> Self {
+        let asset_server = world.get_resource::<AssetServer>().unwrap();
         let palette = vec![
             PaletteElement::new("models/bridge_wood.glb#Scene0", Equivalences::HalfTurn),
             PaletteElement::new("models/ground_grass.glb#Scene0", Equivalences::QuarterTurn),
@@ -285,10 +320,32 @@ impl Map {
             ),
         ];
 
+        let mut prototypes = Vec::new();
+        for index in 0..palette.len() {
+            let elt = &palette[index];
+            let model = asset_server.load(&elt.tile_model);
+            prototypes.push(TilePrototype::new(index, model, elt.equivalences))
+        }
+
         Self {
-            palette,
-            width,
-            height,
+            width: 32,
+            height: 32,
+            prototypes,
+            constraints: Default::default(),
+        }
+    }
+}
+
+struct PaletteElement {
+    pub tile_model: String,
+    pub equivalences: Equivalences,
+}
+
+impl PaletteElement {
+    pub fn new(tile_model: &str, symmetry: Equivalences) -> Self {
+        Self {
+            tile_model: tile_model.to_string(),
+            equivalences: symmetry,
         }
     }
 }

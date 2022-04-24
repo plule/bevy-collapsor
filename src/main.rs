@@ -20,16 +20,15 @@ fn main() {
         })
         .insert_resource(Events::<RulesNeedUpdateEvent>::default())
         .init_resource::<ModelAssets>()
-        .init_resource::<SelectedTileProto>()
+        .init_resource::<TileSelection>()
         .init_resource::<Rules>()
         .add_startup_system(setup)
         .register_inspectable::<Coordinates>()
         .register_inspectable::<RuleTileTag>()
         .register_inspectable::<PaletteTag>()
         .register_inspectable::<Orientation>()
-        .register_inspectable::<TilePrototype>()
-        .register_inspectable::<SelectedTileProto>()
-        .register_inspectable::<OptionalTilePrototype>()
+        .register_inspectable::<Tile>()
+        .register_inspectable::<OptionalTile>()
         .add_system(apply_coordinate)
         .add_system(animate_light_direction)
         .add_system(pick_tile)
@@ -42,13 +41,7 @@ fn main() {
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut models: ResMut<ModelAssets>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
     const HALF_SIZE: f32 = 1.0;
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
@@ -65,27 +58,6 @@ fn setup(
             ..default()
         },
         ..default()
-    });
-
-    let map = Map::new(32, 32);
-
-    models.models = map
-        .palette
-        .iter()
-        .map(|elt| asset_server.load(&elt.tile_model))
-        .collect();
-
-    models.up_cube_mesh = meshes.add(shape::Cube { size: 0.1 }.into());
-    models.up_cube_mat = materials.add(Color::RED.into());
-    models.undecided_mesh = meshes.add(shape::Plane { size: 1.0 }.into());
-    models.undecided_mat = materials.add(Color::BLACK.into());
-    models.impossible_mesh = meshes.add(shape::Plane { size: 1.0 }.into());
-    models.impossible_mat = materials.add(Color::RED.into());
-
-    let pick_mesh = meshes.add(Mesh::from(shape::Plane { size: 1.0 }));
-    let pick_mat = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
-        ..Default::default()
     });
 
     commands
@@ -110,23 +82,20 @@ fn setup(
                     ui.spawn_bundle(TransformBundle::default())
                         .insert(Name::from("palette"))
                         .with_children(|palette| {
-                            for i in 0..map.palette.len() {
-                                let model = models.models[i].clone();
+                            for i in 0..rules.prototypes.len() {
+                                let prototype = &rules.prototypes[i];
+                                let model = prototype.model.clone();
                                 palette
                                     .spawn_bundle(PbrBundle {
-                                        material: pick_mat.clone(),
-                                        mesh: pick_mesh.clone(),
+                                        material: models.pick_mat.clone(),
+                                        mesh: models.pick_mesh.clone(),
                                         ..Default::default()
                                     })
                                     .insert_bundle(PickableBundle::default())
                                     .insert_bundle((
                                         Name::from(format!("tile proto {i}")),
                                         Coordinates::new(i as i32, -1),
-                                        TilePrototype::new(
-                                            i,
-                                            Orientation::North,
-                                            map.palette[i].equivalences,
-                                        ),
+                                        Tile::new(i, Orientation::North),
                                         PaletteTag {},
                                     ))
                                     .with_children(|tile| {
@@ -151,14 +120,14 @@ fn setup(
                                 for y in 0..16 {
                                     rule_map
                                         .spawn_bundle(PbrBundle {
-                                            material: pick_mat.clone(),
-                                            mesh: pick_mesh.clone(),
+                                            material: models.pick_mat.clone(),
+                                            mesh: models.pick_mesh.clone(),
                                             ..Default::default()
                                         })
                                         .insert_bundle((
                                             Name::from(format!("{x}:{y}")),
                                             Coordinates::new(x as i32, y as i32),
-                                            OptionalTilePrototype::default(),
+                                            OptionalTile::default(),
                                             DrawTile::default(),
                                             RuleTileTag::default(),
                                         ))
@@ -170,23 +139,25 @@ fn setup(
         });
 
     // Generated map
-    let mut map_entities = vec![vec![Entity::from_raw(0); map.height]; map.width];
+    let width = rules.width;
+    let height = rules.height;
+    let mut map_entities = vec![vec![Entity::from_raw(0); height]; width];
     commands
         .spawn_bundle(TransformBundle::from_transform(Transform::from_xyz(
-            -((map.width / 2) as f32),
+            -((width / 2) as f32),
             0.0,
-            -((map.height / 2) as f32),
+            -((height / 2) as f32),
         )))
         .insert(Name::from("world_map"))
         .with_children(|rule_map| {
-            for x in 0..map.width {
-                for y in 0..map.height {
+            for x in 0..width {
+                for y in 0..height {
                     let entity = rule_map
                         .spawn_bundle(TransformBundle::default())
                         .insert_bundle((
                             Name::from(format!("{x}:{y}")),
                             Coordinates::new(x as i32, y as i32),
-                            MultiTilePrototype::default(),
+                            TileSuperposition::default(),
                         ))
                         .id();
                     map_entities[x][y] = entity;
@@ -195,8 +166,8 @@ fn setup(
         });
 
     // Compute connectivity
-    for x in 0..map.width {
-        for y in 0..map.height {
+    for x in 0..width {
+        for y in 0..height {
             let mut entity = commands.entity(map_entities[x][y]);
             let coord = Coordinates::new(x as i32, y as i32);
             let mut connectivity = HashMap::new();
@@ -209,19 +180,18 @@ fn setup(
             entity.insert(Connectivity { connectivity });
         }
     }
-
-    commands.insert_resource(map);
 }
 
 fn pick_draw_tile(
-    mut query: Query<(&mut DrawTile, &OptionalTilePrototype, &Hover)>,
-    selected: Res<SelectedTileProto>,
+    mut query: Query<(&mut DrawTile, &OptionalTile, &Hover)>,
+    selection: Res<TileSelection>,
 ) {
     for (mut draw_tile, map_tile, hover) in query.iter_mut() {
         match hover.hovered() {
             true => {
-                if draw_tile.tile != selected.tile_prototype {
-                    draw_tile.tile = selected.tile_prototype.clone();
+                let tile = OptionalTile::new(selection.make_tile());
+                if draw_tile.tile != tile {
+                    draw_tile.tile = tile;
                 }
             }
             false => {
@@ -237,18 +207,21 @@ fn draw_rules(
     query: Query<(Entity, &DrawTile), Changed<DrawTile>>,
     mut commands: Commands,
     models: Res<ModelAssets>,
+    rules: Res<Rules>,
 ) {
     for (entity, draw_tile) in query.iter() {
         let mut entity = commands.entity(entity);
         entity.despawn_descendants();
 
-        if let Some(tile_prototype) = &draw_tile.tile.tile_prototype {
-            entity.with_children(|tile| {
-                let model = models.models[tile_prototype.model_index].clone();
-                let transform = Transform::from_rotation(tile_prototype.orientation.clone().into())
+        if let Some(tile) = &draw_tile.tile.tile {
+            entity.with_children(|parent| {
+                let prototype = &rules.prototypes[tile.prototype_index];
+                let model = prototype.model.clone();
+                let transform = Transform::from_rotation(tile.orientation.clone().into())
                     .with_translation(Vec3::new(0.0, 0.2, 0.0));
 
-                tile.spawn_bundle((transform, GlobalTransform::default()))
+                parent
+                    .spawn_bundle((transform, GlobalTransform::default()))
                     .with_children(|tile| {
                         tile.spawn_scene(model);
                         tile.spawn_bundle(PbrBundle {
@@ -264,9 +237,10 @@ fn draw_rules(
 }
 
 fn draw_map(
-    query: Query<(Entity, &MultiTilePrototype), Changed<MultiTilePrototype>>,
+    query: Query<(Entity, &TileSuperposition), Changed<TileSuperposition>>,
     mut commands: Commands,
     models: Res<ModelAssets>,
+    rules: Res<Rules>,
 ) {
     for (entity, multi_tile) in query.iter() {
         let mut entity = commands.entity(entity);
@@ -283,9 +257,10 @@ fn draw_map(
                 });
             }
             1 => {
-                let prototype = multi_tile.tiles.iter().next().unwrap();
-                let model = models.models[prototype.model_index].clone();
-                let transform = Transform::from_rotation(prototype.orientation.clone().into());
+                let tile = multi_tile.tiles.iter().next().unwrap();
+                let prototype = &rules.prototypes[tile.prototype_index];
+                let model = prototype.model.clone();
+                let transform = Transform::from_rotation(tile.orientation.clone().into());
                 entity.with_children(|tile| {
                     tile.spawn_bundle(TransformBundle::from_transform(transform))
                         .with_children(|tile| {
@@ -315,19 +290,20 @@ fn apply_coordinate(mut query: Query<(&mut Transform, &Coordinates), Changed<Coo
 }
 
 fn pick_tile(
-    mut query: Query<(&mut OptionalTilePrototype, &Hover)>,
-    selected: Res<SelectedTileProto>,
+    mut query: Query<(&mut OptionalTile, &Hover)>,
+    selection: Res<TileSelection>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut event_writer: EventWriter<RulesNeedUpdateEvent>,
 ) {
     let new_tile;
     if mouse_button_input.pressed(MouseButton::Left) {
-        new_tile = selected.tile_prototype.clone();
+        new_tile = selection.make_tile();
     } else if mouse_button_input.pressed(MouseButton::Right) {
-        new_tile = OptionalTilePrototype::default();
+        new_tile = None;
     } else {
         return;
     }
+    let new_tile = OptionalTile::new(new_tile);
 
     let mut changed = false;
     for (mut map_tile, hover) in query.iter_mut() {
@@ -343,16 +319,13 @@ fn pick_tile(
 }
 
 /// Safe tile get from indexes
-fn get_tile_prototype(
-    map: &Vec<Vec<OptionalTilePrototype>>,
-    coordinates: &Coordinates,
-) -> Option<TilePrototype> {
+fn get_tile_prototype(map: &Vec<Vec<OptionalTile>>, coordinates: &Coordinates) -> Option<Tile> {
     if coordinates.x < 0 || coordinates.y < 0 {
         return None;
     }
     let line = map.get(coordinates.x as usize)?;
     let tile = line.get(coordinates.y as usize)?;
-    tile.tile_prototype.clone()
+    tile.tile.clone()
 }
 
 /// Safe tile get from indexes
@@ -366,26 +339,33 @@ fn get_tile_entity(map: &Vec<Vec<Entity>>, coordinates: &Coordinates) -> Option<
 }
 
 fn expand_with_rotations(
-    constraints: &HashMap<TilePrototype, Constraints>,
-) -> HashMap<TilePrototype, Constraints> {
-    let mut expanded = HashMap::<TilePrototype, Constraints>::new();
+    constraints: &HashMap<Tile, Constraints>,
+    prototypes: &Vec<TilePrototype>,
+) -> HashMap<Tile, Constraints> {
+    let mut expanded = HashMap::<Tile, Constraints>::new();
+
     for (tile, tile_constraints) in constraints.iter() {
+        let prototype = &prototypes[tile.prototype_index];
         for tile_rotations in 0..Orientation::values().len() as i32 {
-            let new_variant_constraints_entry =
-                expanded.entry(tile.rotated(tile_rotations)).or_default();
+            let rotated_tile = prototype.make_rotated_tile(tile.orientation, tile_rotations);
+            let new_variant_constraints_entry = expanded.entry(rotated_tile).or_default();
 
             for (orientation, allowed_values) in tile_constraints.constraints.iter() {
-                let new_constraints_entry: &mut HashSet<TilePrototype> =
-                    new_variant_constraints_entry
-                        .constraints
-                        .entry(orientation.rotated(tile_rotations))
-                        .or_default();
+                let new_constraints_entry: &mut HashSet<Tile> = new_variant_constraints_entry
+                    .constraints
+                    .entry(orientation.rotated(tile_rotations))
+                    .or_default();
                 for allowed_tile in allowed_values.iter() {
-                    new_constraints_entry.insert(allowed_tile.rotated(tile_rotations));
+                    let prototype = &prototypes[allowed_tile.prototype_index];
+                    let rotated_allowed_tile =
+                        prototype.make_rotated_tile(allowed_tile.orientation, tile_rotations);
+                    new_constraints_entry.insert(rotated_allowed_tile);
                 }
             }
         }
     }
+
+    info!("{:#?}", expanded);
 
     expanded
 }
@@ -395,11 +375,10 @@ fn intersection<T: Eq + Hash>(a: HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
 }
 
 fn collapse(
-    map: Res<Map>,
     mut rules: ResMut<Rules>,
-    rules_query: Query<(&OptionalTilePrototype, &Coordinates), With<RuleTileTag>>,
+    rules_query: Query<(&OptionalTile, &Coordinates), With<RuleTileTag>>,
     mut event_reader: EventReader<RulesNeedUpdateEvent>,
-    mut tiles_query: Query<(Entity, &mut MultiTilePrototype, &Connectivity)>,
+    mut tiles_query: Query<(Entity, &mut TileSuperposition, &Connectivity)>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -409,18 +388,20 @@ fn collapse(
         // Rule change
 
         // Read the rule map
-        let mut rule_tiles = vec![vec![OptionalTilePrototype::default(); map.height]; map.width];
+        let rule_width = 16;
+        let rule_height = 16;
+        let mut rule_tiles = vec![vec![OptionalTile::default(); rule_width]; rule_height];
         for (tile, coordinates) in rules_query.iter() {
             rule_tiles[coordinates.x as usize][coordinates.y as usize] = tile.clone();
         }
 
         // Store the rule connectivities as constraints
-        rules.constraints = HashMap::<TilePrototype, Constraints>::new();
-        for x in 0..map.width {
-            for y in 0..map.height {
+        rules.constraints = HashMap::<Tile, Constraints>::new();
+        for x in 0..rule_width {
+            for y in 0..rule_height {
                 let tile = &rule_tiles[x][y];
                 let coords = Coordinates::new(x as i32, y as i32);
-                if let Some(tile) = &tile.tile_prototype {
+                if let Some(tile) = &tile.tile {
                     let constraints = &mut rules
                         .constraints
                         .entry(tile.clone())
@@ -440,7 +421,7 @@ fn collapse(
                 }
             }
         }
-        rules.constraints = expand_with_rotations(&rules.constraints);
+        rules.constraints = expand_with_rotations(&rules.constraints, &rules.prototypes);
 
         // Reset to every possibilities on rule change
         let mut possible_tiles = HashSet::new();
@@ -500,8 +481,6 @@ fn collapse(
         let mut need_propagation = HashSet::<usize>::new();
         need_propagation.insert(min_entropy_entity);
         while !need_propagation.is_empty() {
-            info!("Propagating to {} entities", need_propagation.len());
-
             // Pop an entity needing propagation
             let propagating_entity = need_propagation.iter().next().cloned().unwrap();
             need_propagation.take(&propagating_entity).unwrap();
@@ -521,7 +500,7 @@ fn collapse(
             for orientation in Orientation::values() {
                 if let Some(neighbour) = propagating_connectivity.get(&orientation) {
                     // Sum all the possible values for this neighbour given its own allowed values
-                    let mut all_allowed_neighbour = HashSet::<TilePrototype>::new();
+                    let mut all_allowed_neighbour = HashSet::<Tile>::new();
                     for value in &propagating_wave {
                         let rule_constraints = rules
                             .constraints
@@ -552,7 +531,7 @@ fn collapse(
     // Apply the result to the entities
     for i in 0..count {
         let mut multitiles = tiles_query
-            .get_component_mut::<MultiTilePrototype>(entities[i])
+            .get_component_mut::<TileSuperposition>(entities[i])
             .unwrap();
         if multitiles.tiles != waves[i] {
             multitiles.tiles = waves[i].clone();
@@ -560,8 +539,8 @@ fn collapse(
     }
 }
 
-fn observe(multi_tile_prototype: &mut HashSet<TilePrototype>, rng: &mut rand::prelude::ThreadRng) {
-    let tile_vec: Vec<&TilePrototype> = multi_tile_prototype.iter().collect();
+fn observe(multi_tile_prototype: &mut HashSet<Tile>, rng: &mut rand::prelude::ThreadRng) {
+    let tile_vec: Vec<&Tile> = multi_tile_prototype.iter().collect();
     let observed = *tile_vec.choose(rng).unwrap().clone();
     multi_tile_prototype.clear();
     multi_tile_prototype.insert(observed.clone());
@@ -569,14 +548,17 @@ fn observe(multi_tile_prototype: &mut HashSet<TilePrototype>, rng: &mut rand::pr
 
 fn palette_select(
     mut events: EventReader<PickingEvent>,
-    mut selected: ResMut<SelectedTileProto>,
-    palette_query: Query<&TilePrototype, With<PaletteTag>>,
+    mut selection: ResMut<TileSelection>,
+    palette_query: Query<&Tile, With<PaletteTag>>,
+    rules: Res<Rules>,
 ) {
     for event in events.iter() {
         match event {
             PickingEvent::Clicked(e) => {
                 match palette_query.get(*e) {
-                    Ok(e) => selected.tile_prototype = OptionalTilePrototype::from(e.clone()),
+                    Ok(e) => {
+                        selection.prototype = Some(rules.prototypes[e.prototype_index].clone())
+                    }
                     Err(_) => (),
                 };
             }
@@ -587,13 +569,10 @@ fn palette_select(
 
 fn on_mouse_wheel(
     mut mouse_wheel_events: EventReader<MouseWheel>,
-    mut selected_tile: ResMut<SelectedTileProto>,
+    mut selection: ResMut<TileSelection>,
 ) {
-    let selected_tile = &mut selected_tile.tile_prototype;
-    if let Some(selected_tile) = &mut selected_tile.tile_prototype {
-        for event in mouse_wheel_events.iter() {
-            selected_tile.rotate(event.y as i32);
-        }
+    for event in mouse_wheel_events.iter() {
+        selection.rotation += event.y as i32;
     }
 }
 
