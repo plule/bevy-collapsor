@@ -16,27 +16,41 @@ pub struct ModelAssets {
     pub impossible_mat: Handle<StandardMaterial>,
 }
 
+/// Variation of the palette elements that are equivalents
+#[derive(Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug)]
+pub enum Equivalences {
+    None,
+    HalfTurn,
+    QuarterTurn,
+}
+
+impl Default for Equivalences {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 #[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive, Hash, Eq, Debug)]
 pub enum Orientation {
-    NORTH = 0,
-    EST,
-    SOUTH,
-    WEST,
+    North = 0,
+    East,
+    South,
+    West,
 }
 
 impl Default for Orientation {
     fn default() -> Self {
-        Orientation::NORTH
+        Orientation::North
     }
 }
 
 impl From<Orientation> for Quat {
     fn from(orientation: Orientation) -> Self {
         let angle = match orientation {
-            Orientation::NORTH => 0.,
-            Orientation::EST => -90.0_f32.to_radians(),
-            Orientation::SOUTH => -180.0_f32.to_radians(),
-            Orientation::WEST => -270.0_f32.to_radians(),
+            Orientation::North => 0.,
+            Orientation::East => -90.0_f32.to_radians(),
+            Orientation::South => -180.0_f32.to_radians(),
+            Orientation::West => -270.0_f32.to_radians(),
         };
         Quat::from_rotation_y(angle)
     }
@@ -45,10 +59,10 @@ impl From<Orientation> for Quat {
 impl Orientation {
     pub fn values() -> [Orientation; 4] {
         [
-            Orientation::NORTH,
-            Orientation::EST,
-            Orientation::SOUTH,
-            Orientation::WEST,
+            Orientation::North,
+            Orientation::East,
+            Orientation::South,
+            Orientation::West,
         ]
     }
 
@@ -64,10 +78,10 @@ impl Orientation {
 
     pub fn offset(&self, coordinate: &Coordinates) -> Coordinates {
         match self {
-            Orientation::NORTH => Coordinates::new(coordinate.x, coordinate.y + 1),
-            Orientation::EST => Coordinates::new(coordinate.x - 1, coordinate.y),
-            Orientation::SOUTH => Coordinates::new(coordinate.x, coordinate.y - 1),
-            Orientation::WEST => Coordinates::new(coordinate.x + 1, coordinate.y),
+            Orientation::North => Coordinates::new(coordinate.x, coordinate.y + 1),
+            Orientation::East => Coordinates::new(coordinate.x - 1, coordinate.y),
+            Orientation::South => Coordinates::new(coordinate.x, coordinate.y - 1),
+            Orientation::West => Coordinates::new(coordinate.x + 1, coordinate.y),
         }
     }
 }
@@ -76,14 +90,38 @@ impl Orientation {
 pub struct TilePrototype {
     pub model_index: usize,
     pub orientation: Orientation,
+    pub equivalences: Equivalences,
 }
 
 impl TilePrototype {
+    pub fn new(model_index: usize, orientation: Orientation, equivalences: Equivalences) -> Self {
+        Self {
+            model_index,
+            orientation,
+            equivalences,
+        }
+    }
+
     pub fn rotated(&self, amount: i32) -> Self {
         TilePrototype {
             model_index: self.model_index,
             orientation: self.orientation.rotated(amount),
+            equivalences: self.equivalences,
         }
+    }
+
+    /// Get all the tile prototypes equivalent.
+    pub fn equivalences(&self) -> Vec<Self> {
+        let rotations = match self.equivalences {
+            Equivalences::None => vec![0],
+            Equivalences::HalfTurn => vec![0, 2],
+            Equivalences::QuarterTurn => vec![0, 1, 2, 3],
+        };
+
+        rotations
+            .iter()
+            .map(|rotation| self.rotated(*rotation))
+            .collect()
     }
 }
 
@@ -113,6 +151,14 @@ impl OptionalTilePrototype {
     }
 }
 
+impl From<TilePrototype> for OptionalTilePrototype {
+    fn from(prototype: TilePrototype) -> Self {
+        Self {
+            tile_prototype: Some(prototype),
+        }
+    }
+}
+
 #[derive(Default, Inspectable)]
 pub struct SelectedTileProto {
     pub tile_prototype: OptionalTilePrototype,
@@ -122,15 +168,7 @@ pub struct SelectedTileProto {
 pub struct RuleTileTag;
 
 #[derive(Component, Inspectable)]
-pub struct Palette {
-    pub index: usize,
-}
-
-impl Palette {
-    pub fn new(index: usize) -> Self {
-        Self { index }
-    }
-}
+pub struct PaletteTag {}
 
 #[derive(Component, Inspectable, Default)]
 pub struct Coordinates {
@@ -156,40 +194,72 @@ pub struct Connectivity {
     pub connectivity: HashMap<Orientation, Entity>,
 }
 
-pub struct Map {
-    pub tile_models: Vec<String>,
-    pub width: usize,
-    pub height: usize,
-}
-
 #[derive(Default, Debug)]
 pub struct Rules {
     pub constraints: HashMap<TilePrototype, Constraints>,
 }
 
+pub struct PaletteElement {
+    pub tile_model: String,
+    pub equivalences: Equivalences,
+}
+
+impl PaletteElement {
+    pub fn new(tile_model: &str, symmetry: Equivalences) -> Self {
+        Self {
+            tile_model: tile_model.to_string(),
+            equivalences: symmetry,
+        }
+    }
+}
+
+pub struct Map {
+    pub palette: Vec<PaletteElement>,
+    pub width: usize,
+    pub height: usize,
+}
+
 impl Map {
     pub fn new(width: usize, height: usize) -> Self {
-        let tile_models = vec![
-            "models/bridge_wood.glb#Scene0".to_string(),
-            "models/ground_grass.glb#Scene0".to_string(),
-            "models/ground_pathBend.glb#Scene0".to_string(),
-            "models/ground_pathCross.glb#Scene0".to_string(),
-            "models/ground_pathEndClosed.glb#Scene0".to_string(),
-            "models/ground_pathSplit.glb#Scene0".to_string(),
-            "models/ground_pathStraight.glb#Scene0".to_string(),
-            "models/ground_riverBendBank.glb#Scene0".to_string(),
-            "models/ground_riverCorner.glb#Scene0".to_string(),
-            "models/ground_riverCross.glb#Scene0".to_string(),
-            "models/ground_riverEndClosed.glb#Scene0".to_string(),
-            "models/ground_riverOpen.glb#Scene0".to_string(),
-            "models/ground_riverSide.glb#Scene0".to_string(),
-            "models/ground_riverSideOpen.glb#Scene0".to_string(),
-            "models/ground_riverSplit.glb#Scene0".to_string(),
-            "models/ground_riverStraight.glb#Scene0".to_string(),
+        let palette = vec![
+            PaletteElement::new("models/bridge_wood.glb#Scene0", Equivalences::HalfTurn),
+            PaletteElement::new("models/ground_grass.glb#Scene0", Equivalences::QuarterTurn),
+            PaletteElement::new("models/ground_pathBend.glb#Scene0", Equivalences::None),
+            PaletteElement::new(
+                "models/ground_pathCross.glb#Scene0",
+                Equivalences::QuarterTurn,
+            ),
+            PaletteElement::new("models/ground_pathEndClosed.glb#Scene0", Equivalences::None),
+            PaletteElement::new("models/ground_pathSplit.glb#Scene0", Equivalences::None),
+            PaletteElement::new(
+                "models/ground_pathStraight.glb#Scene0",
+                Equivalences::HalfTurn,
+            ),
+            PaletteElement::new("models/ground_riverBendBank.glb#Scene0", Equivalences::None),
+            PaletteElement::new("models/ground_riverCorner.glb#Scene0", Equivalences::None),
+            PaletteElement::new(
+                "models/ground_riverCross.glb#Scene0",
+                Equivalences::QuarterTurn,
+            ),
+            PaletteElement::new(
+                "models/ground_riverEndClosed.glb#Scene0",
+                Equivalences::None,
+            ),
+            PaletteElement::new(
+                "models/ground_riverOpen.glb#Scene0",
+                Equivalences::QuarterTurn,
+            ),
+            PaletteElement::new("models/ground_riverSide.glb#Scene0", Equivalences::None),
+            PaletteElement::new("models/ground_riverSideOpen.glb#Scene0", Equivalences::None),
+            PaletteElement::new("models/ground_riverSplit.glb#Scene0", Equivalences::None),
+            PaletteElement::new(
+                "models/ground_riverStraight.glb#Scene0",
+                Equivalences::HalfTurn,
+            ),
         ];
 
         Self {
-            tile_models,
+            palette,
             width,
             height,
         }
@@ -199,9 +269,9 @@ impl Map {
 #[cfg(test)]
 #[test]
 fn rotate_orientation() {
-    let mut orientation = Orientation::NORTH;
+    let mut orientation = Orientation::North;
     orientation.rotate(-2);
-    assert!(orientation == Orientation::SOUTH);
+    assert!(orientation == Orientation::South);
     orientation.rotate(1);
-    assert!(orientation == Orientation::WEST);
+    assert!(orientation == Orientation::West);
 }

@@ -25,7 +25,7 @@ fn main() {
         .add_startup_system(setup)
         .register_inspectable::<Coordinates>()
         .register_inspectable::<RuleTileTag>()
-        .register_inspectable::<Palette>()
+        .register_inspectable::<PaletteTag>()
         .register_inspectable::<Orientation>()
         .register_inspectable::<TilePrototype>()
         .register_inspectable::<SelectedTileProto>()
@@ -70,9 +70,9 @@ fn setup(
     let map = Map::new(16, 16);
 
     models.models = map
-        .tile_models
+        .palette
         .iter()
-        .map(|path| asset_server.load(path))
+        .map(|elt| asset_server.load(&elt.tile_model))
         .collect();
 
     models.up_cube_mesh = meshes.add(shape::Cube { size: 0.1 }.into());
@@ -110,7 +110,7 @@ fn setup(
                     ui.spawn_bundle(TransformBundle::default())
                         .insert(Name::from("palette"))
                         .with_children(|palette| {
-                            for i in 0..map.tile_models.len() {
+                            for i in 0..map.palette.len() {
                                 let model = models.models[i].clone();
                                 palette
                                     .spawn_bundle(PbrBundle {
@@ -122,7 +122,12 @@ fn setup(
                                     .insert_bundle((
                                         Name::from(format!("tile proto {i}")),
                                         Coordinates::new(i as i32, -1),
-                                        Palette::new(i),
+                                        TilePrototype::new(
+                                            i,
+                                            Orientation::North,
+                                            map.palette[i].equivalences,
+                                        ),
+                                        PaletteTag {},
                                     ))
                                     .with_children(|tile| {
                                         tile.spawn_bundle((
@@ -365,17 +370,23 @@ fn expand_with_rotations(
 ) -> HashMap<TilePrototype, Constraints> {
     let mut expanded = HashMap::<TilePrototype, Constraints>::new();
     for (tile, tile_constraints) in constraints.iter() {
-        for variant in 0..Orientation::values().len() as i32 {
-            let new_variant_constraints_entry = expanded.entry(tile.rotated(variant)).or_default();
+        for equivalent_tile in tile.equivalences() {
+            for variant in 0..Orientation::values().len() as i32 {
+                let new_variant_constraints_entry = expanded
+                    .entry(equivalent_tile.rotated(variant))
+                    .or_default();
 
-            for (orientation, allowed_values) in tile_constraints.constraints.iter() {
-                let new_constraints_entry: &mut HashSet<TilePrototype> =
-                    new_variant_constraints_entry
-                        .constraints
-                        .entry(orientation.rotated(variant))
-                        .or_default();
-                for allowed_tile in allowed_values.iter() {
-                    new_constraints_entry.insert(allowed_tile.rotated(variant));
+                for (orientation, allowed_values) in tile_constraints.constraints.iter() {
+                    let new_constraints_entry: &mut HashSet<TilePrototype> =
+                        new_variant_constraints_entry
+                            .constraints
+                            .entry(orientation.rotated(variant))
+                            .or_default();
+                    for allowed_tile in allowed_values.iter() {
+                        for equivalent_allowed_tile in allowed_tile.equivalences() {
+                            new_constraints_entry.insert(equivalent_allowed_tile.rotated(variant));
+                        }
+                    }
                 }
             }
         }
@@ -501,6 +512,13 @@ fn collapse(
 
             // Get all its allowed values and its connectivity
             let propagating_wave = waves[propagating_entity].clone();
+
+            if propagating_wave.is_empty() {
+                // Impossible to solve
+                // Avoid propagating it everywhere
+                continue;
+            }
+
             let propagating_connectivity = connectivities[propagating_entity].clone();
 
             // Find its neighbours
@@ -556,13 +574,13 @@ fn observe(multi_tile_prototype: &mut HashSet<TilePrototype>, rng: &mut rand::pr
 fn palette_select(
     mut events: EventReader<PickingEvent>,
     mut selected: ResMut<SelectedTileProto>,
-    palette_query: Query<&Palette>,
+    palette_query: Query<&TilePrototype, With<PaletteTag>>,
 ) {
     for event in events.iter() {
         match event {
             PickingEvent::Clicked(e) => {
                 match palette_query.get(*e) {
-                    Ok(e) => selected.tile_prototype = OptionalTilePrototype::from_index(e.index),
+                    Ok(e) => selected.tile_prototype = OptionalTilePrototype::from(e.clone()),
                     Err(_) => (),
                 };
             }
