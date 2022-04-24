@@ -155,65 +155,74 @@ fn observe_system(mut query: Query<(Entity, &mut TileSuperposition)>) {
     min_entropy_wave.dirty = true;
 }
 
-fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut TileSuperposition, &Connectivity)>) {
-    // Find a dirty wave
-    let mut propagating_entity = Option::<Entity>::default();
-    for (entity, wave, _) in query.iter() {
-        if wave.dirty {
-            propagating_entity = Some(entity);
-            break;
-        }
-    }
-
-    let propagating_entity = match propagating_entity {
-        Some(e) => e,
-        None => return,
-    };
-
-    // Get all its allowed values and its connectivity
-    let (_, propagating_wave, propagating_connectivity) = query.get(propagating_entity).unwrap();
-
-    let propagating_wave = propagating_wave.tiles.clone();
-    let propagating_connectivity = propagating_connectivity.connectivity.clone();
-
-    // Find its neighbours
-    for orientation in Orientation::values() {
-        if let Some(neighbour) = propagating_connectivity.get(&orientation) {
-            let neighbour_wave = &mut query
-                .get_component_mut::<TileSuperposition>(*neighbour)
-                .unwrap();
-
-            // Skip if the neighbour is already resolved or impossible
-            if neighbour_wave.tiles.len() <= 1 {
-                continue;
-            }
-
-            // Sum all the possible values for this neighbour given its own allowed values
-            let mut all_allowed_neighbour = HashSet::<Tile>::new();
-            for value in &propagating_wave {
-                let rule_constraints = rules.alloweds.get(value).unwrap().allowed.get(&orientation);
-                if let Some(allowed_neighbour) = rule_constraints {
-                    all_allowed_neighbour.extend(allowed_neighbour);
-                }
-            }
-
-            // Intersect the previous list of allowed values with the new constraints
-            let new_allowed_values = intersection(all_allowed_neighbour, &mut neighbour_wave.tiles);
-
-            // If impacted, update the tile and mark it as dirty for propagation
-            if &new_allowed_values != &neighbour_wave.tiles {
-                neighbour_wave.tiles = new_allowed_values;
-                if !neighbour_wave.tiles.is_empty() {
-                    // Don't propagate impossibility
-                    neighbour_wave.dirty = true;
-                }
+fn collapse(
+    rules: Res<Rules>,
+    tuning: Res<Tuning>,
+    mut query: Query<(Entity, &mut TileSuperposition, &Connectivity)>,
+) {
+    for _ in 0..tuning.collapse_per_frame {
+        // Find a dirty wave
+        let mut propagating_entity = Option::<Entity>::default();
+        for (entity, wave, _) in query.iter() {
+            if wave.dirty {
+                propagating_entity = Some(entity);
+                break;
             }
         }
-    }
 
-    // Mark the entity as not dirty
-    let mut wave = query
-        .get_component_mut::<TileSuperposition>(propagating_entity)
-        .unwrap();
-    wave.dirty = false;
+        let propagating_entity = match propagating_entity {
+            Some(e) => e,
+            None => return,
+        };
+
+        // Get all its allowed values and its connectivity
+        let (_, propagating_wave, propagating_connectivity) =
+            query.get(propagating_entity).unwrap();
+
+        let propagating_wave = propagating_wave.tiles.clone();
+        let propagating_connectivity = propagating_connectivity.connectivity.clone();
+
+        // Find its neighbours
+        for orientation in Orientation::values() {
+            if let Some(neighbour) = propagating_connectivity.get(&orientation) {
+                let neighbour_wave = &mut query
+                    .get_component_mut::<TileSuperposition>(*neighbour)
+                    .unwrap();
+
+                // Skip if the neighbour is already resolved or impossible
+                if neighbour_wave.tiles.len() <= 1 {
+                    continue;
+                }
+
+                // Sum all the possible values for this neighbour given its own allowed values
+                let mut all_allowed_neighbour = HashSet::<Tile>::new();
+                for value in &propagating_wave {
+                    let rule_constraints =
+                        rules.alloweds.get(value).unwrap().allowed.get(&orientation);
+                    if let Some(allowed_neighbour) = rule_constraints {
+                        all_allowed_neighbour.extend(allowed_neighbour);
+                    }
+                }
+
+                // Intersect the previous list of allowed values with the new constraints
+                let new_allowed_values =
+                    intersection(all_allowed_neighbour, &mut neighbour_wave.tiles);
+
+                // If impacted, update the tile and mark it as dirty for propagation
+                if &new_allowed_values != &neighbour_wave.tiles {
+                    neighbour_wave.tiles = new_allowed_values;
+                    if !neighbour_wave.tiles.is_empty() {
+                        // Don't propagate impossibility
+                        neighbour_wave.dirty = true;
+                    }
+                }
+            }
+        }
+
+        // Mark the entity as not dirty
+        let mut wave = query
+            .get_component_mut::<TileSuperposition>(propagating_entity)
+            .unwrap();
+        wave.dirty = false;
+    }
 }

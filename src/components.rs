@@ -13,6 +13,8 @@ impl Plugin for ComponentsPlugin {
             .init_resource::<ModelAssets>()
             .init_resource::<TileSelection>()
             .init_resource::<Rules>()
+            .init_resource::<Tuning>()
+            .register_inspectable::<Tuning>()
             .register_inspectable::<Coordinates>()
             .register_inspectable::<RuleTileTag>()
             .register_inspectable::<PaletteTag>()
@@ -266,6 +268,20 @@ pub struct Allowed {
 #[derive(Component, Default, Clone)]
 pub struct Connectivity {
     pub connectivity: HashMap<Orientation, Entity>,
+}
+
+#[derive(Component, Inspectable)]
+pub struct Tuning {
+    #[inspectable(min = 1)]
+    pub collapse_per_frame: usize,
+}
+
+impl Default for Tuning {
+    fn default() -> Self {
+        Self {
+            collapse_per_frame: 100,
+        }
+    }
 }
 
 #[derive(Debug)]

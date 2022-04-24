@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
-use bevy_inspector_egui::WorldInspectorPlugin;
+use bevy_inspector_egui::{InspectorPlugin, WorldInspectorPlugin};
 use bevy_mod_picking::*;
 
 mod components;
@@ -13,6 +13,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
+        .add_plugin(InspectorPlugin::<Tuning>::new())
         .add_plugins(DefaultPickingPlugins)
         .add_plugin(components::ComponentsPlugin)
         .add_plugin(wcf::WCFPlugin)
