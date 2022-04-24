@@ -9,7 +9,7 @@ pub struct WCFPlugin;
 
 impl Plugin for WCFPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(collapse);
+        app.add_system(collapse).add_system(update_rules);
     }
 }
 
@@ -57,14 +57,12 @@ fn intersection<T: Eq + Hash>(a: HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
     a.into_iter().filter(|e| b.contains(e)).collect()
 }
 
-fn collapse(
+fn update_rules(
     mut rules: ResMut<Rules>,
     rules_query: Query<(&OptionalTile, &Coordinates), With<RuleTileTag>>,
     mut event_reader: EventReader<RulesNeedUpdateEvent>,
     mut tiles_query: Query<(Entity, &mut TileSuperposition, &Connectivity)>,
 ) {
-    let mut rng = rand::thread_rng();
-
     if !event_reader.is_empty() {
         info!("Rules changed, clearing");
         for _ in event_reader.iter() {}
@@ -111,112 +109,95 @@ fn collapse(
             multi_tile_prototype.tiles = possible_tiles.clone();
         }
     }
+}
 
-    // Store locally the state
-    let mut entity_indexes = HashMap::<Entity, usize>::new();
-    let mut entities = Vec::new();
-    let mut index: usize = 0;
-    for (entity, _, _) in tiles_query.iter() {
-        entity_indexes.insert(entity, index);
-        entities.push(entity);
-        index += 1;
-    }
-    let count = index;
-
-    let mut waves = Vec::new();
-    let mut connectivities = Vec::new();
-    for (_, multi_line_prototype, connectivity) in tiles_query.iter() {
-        waves.push(multi_line_prototype.tiles.clone());
-        let mut connectivity_by_index = HashMap::new();
-        for (orientation, entity) in connectivity.connectivity.iter() {
-            connectivity_by_index.insert(*orientation, *entity_indexes.get(entity).unwrap());
-        }
-        connectivities.push(connectivity_by_index);
-    }
+fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut TileSuperposition, &Connectivity)>) {
+    let mut rng = rand::thread_rng();
 
     // Find the smallest > 1 entropy
     let mut min_entropy_entities = Vec::new();
     let mut min_entropy = usize::MAX;
 
-    for i in 0..count {
-        let entropy = waves[i].len();
+    for (e, waves, _) in query.iter() {
+        let entropy = waves.tiles.len();
         if entropy < min_entropy && entropy > 1 {
             min_entropy = entropy;
             min_entropy_entities.clear();
         }
 
         if entropy == min_entropy {
-            min_entropy_entities.push(i);
+            min_entropy_entities.push(e);
         }
     }
-    let min_entropy_entity = min_entropy_entities.choose(&mut rng);
 
-    if let Some(min_entropy_entity) = min_entropy_entity {
-        let min_entropy_entity = *min_entropy_entity;
-        // Observe the tile with the smallest entropy
-        observe(&mut waves[min_entropy_entity], &mut rng);
+    let min_entropy_entity = match min_entropy_entities.choose(&mut rng) {
+        Some(e) => *e,
+        None => return,
+    };
 
-        // Propagate
-        let mut need_propagation = HashSet::<usize>::new();
-        need_propagation.insert(min_entropy_entity);
-        while !need_propagation.is_empty() {
-            // Pop an entity needing propagation
-            let propagating_entity = need_propagation.iter().next().cloned().unwrap();
-            need_propagation.take(&propagating_entity).unwrap();
+    let min_entropy_wave = &mut query
+        .get_component_mut::<TileSuperposition>(min_entropy_entity)
+        .unwrap()
+        .tiles;
 
-            // Get all its allowed values and its connectivity
-            let propagating_wave = waves[propagating_entity].clone();
+    // Observe the tile with the smallest entropy
+    observe(min_entropy_wave, &mut rng);
 
-            if propagating_wave.is_empty() {
-                // Impossible to solve
-                // Avoid propagating it everywhere
-                continue;
-            }
+    // Propagate
+    let mut need_propagation = HashSet::new();
+    need_propagation.insert(min_entropy_entity);
+    while !need_propagation.is_empty() {
+        // Pop an entity needing propagation
+        let propagating_entity = need_propagation.iter().next().cloned().unwrap();
+        need_propagation.take(&propagating_entity).unwrap();
 
-            let propagating_connectivity = connectivities[propagating_entity].clone();
+        // Get all its allowed values and its connectivity
+        let (_, propagating_wave, propagating_connectivity) =
+            query.get(propagating_entity).unwrap();
 
-            // Find its neighbours
-            for orientation in Orientation::values() {
-                if let Some(neighbour) = propagating_connectivity.get(&orientation) {
-                    // Sum all the possible values for this neighbour given its own allowed values
-                    let mut all_allowed_neighbour = HashSet::<Tile>::new();
-                    for value in &propagating_wave {
-                        let rule_constraints =
-                            rules.alloweds.get(value).unwrap().allowed.get(&orientation);
-                        if let Some(allowed_neighbour) = rule_constraints {
-                            all_allowed_neighbour.extend(allowed_neighbour);
-                        }
+        if propagating_wave.tiles.is_empty() {
+            // Impossible to solve
+            // Avoid propagating it everywhere
+            // TODO forbid the observation
+            continue;
+        }
+
+        let propagating_wave = propagating_wave.tiles.clone();
+        let propagating_connectivity = propagating_connectivity.connectivity.clone();
+
+        // Find its neighbours
+        for orientation in Orientation::values() {
+            if let Some(neighbour) = propagating_connectivity.get(&orientation) {
+                // Sum all the possible values for this neighbour given its own allowed values
+                let mut all_allowed_neighbour = HashSet::<Tile>::new();
+                for value in &propagating_wave {
+                    let rule_constraints =
+                        rules.alloweds.get(value).unwrap().allowed.get(&orientation);
+                    if let Some(allowed_neighbour) = rule_constraints {
+                        all_allowed_neighbour.extend(allowed_neighbour);
                     }
+                }
 
-                    // Intersect the previous list of allowed values with the new constraints
-                    let new_allowed_values =
-                        intersection(all_allowed_neighbour, &waves[*neighbour]);
+                // Intersect the previous list of allowed values with the new constraints
+                let neighbour_wave = &mut query
+                    .get_component_mut::<TileSuperposition>(*neighbour)
+                    .unwrap();
+                let neighbour_wave = &mut neighbour_wave.tiles;
+                let new_allowed_values = intersection(all_allowed_neighbour, neighbour_wave);
 
-                    // If impacted, update the tile and add it to the list needing propagation
-                    if &new_allowed_values != &waves[*neighbour] {
-                        need_propagation.insert(*neighbour);
-                        waves[*neighbour].clear();
-                        waves[*neighbour].extend(new_allowed_values.iter());
-                    }
+                // If impacted, update the tile and add it to the list needing propagation
+                if &new_allowed_values != neighbour_wave {
+                    need_propagation.insert(*neighbour);
+                    *neighbour_wave = new_allowed_values;
                 }
             }
         }
     }
-
-    // Apply the result to the entities
-    for i in 0..count {
-        let mut multitiles = tiles_query
-            .get_component_mut::<TileSuperposition>(entities[i])
-            .unwrap();
-        if multitiles.tiles != waves[i] {
-            multitiles.tiles = waves[i].clone();
-        }
-    }
 }
 
-fn observe(multi_tile_prototype: &mut HashSet<Tile>, rng: &mut rand::prelude::ThreadRng) {
-    let tile_vec: Vec<&Tile> = multi_tile_prototype.iter().collect();
+fn observe(wave: &mut HashSet<Tile>, rng: &mut rand::prelude::ThreadRng) {
+    let tile_vec: Vec<&Tile> = wave.iter().collect();
     let observed = *tile_vec.choose(rng).unwrap().clone();
-    multi_tile_prototype.clear();
-    multi_tile_prototype.insert(observed.clone());
+    wave.clear();
+    wave.insert(observed.clone());
 }
