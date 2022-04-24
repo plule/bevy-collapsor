@@ -67,7 +67,7 @@ fn setup(
         ..default()
     });
 
-    let map = Map::new(16, 16);
+    let map = Map::new(32, 32);
 
     models.models = map
         .palette
@@ -147,8 +147,8 @@ fn setup(
                     ui.spawn_bundle(TransformBundle::default())
                         .insert(Name::from("rule_map"))
                         .with_children(|rule_map| {
-                            for x in 0..map.width {
-                                for y in 0..map.height {
+                            for x in 0..16 {
+                                for y in 0..16 {
                                     rule_map
                                         .spawn_bundle(PbrBundle {
                                             material: pick_mat.clone(),

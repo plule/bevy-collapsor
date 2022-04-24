@@ -242,6 +242,10 @@ impl Map {
                 Equivalences::QuarterTurn,
             ),
             PaletteElement::new(
+                "models/ground_riverCornerSmall.glb#Scene0",
+                Equivalences::None,
+            ),
+            PaletteElement::new(
                 "models/ground_riverEndClosed.glb#Scene0",
                 Equivalences::None,
             ),
