@@ -119,39 +119,18 @@ impl Orientation {
 }
 
 #[derive(Default, Component, Clone, PartialEq, Hash, Eq, Debug)]
-pub struct TilePrototype {
+pub struct Prototype {
     pub index: usize,
     pub model: Handle<Scene>,
     pub equivalences: Equivalences,
 }
 
-impl TilePrototype {
+impl Prototype {
     pub fn new(index: usize, model: Handle<Scene>, equivalences: Equivalences) -> Self {
         Self {
             index,
             model,
             equivalences,
-        }
-    }
-
-    pub fn equivalent_directions(&self, direction: Orientation) -> Vec<Orientation> {
-        let equivalent_rotations = match self.equivalences {
-            Equivalences::None => vec![0],
-            Equivalences::HalfTurn => vec![0, 2],
-            Equivalences::QuarterTurn => vec![0, 1, 2, 3, 4],
-        };
-
-        equivalent_rotations
-            .iter()
-            .map(|rotation| direction.rotated(*rotation))
-            .collect()
-    }
-
-    pub fn available_rotations(&self) -> Vec<i32> {
-        match self.equivalences {
-            Equivalences::None => vec![0, 1, 2, 3],
-            Equivalences::HalfTurn => vec![0, 1],
-            Equivalences::QuarterTurn => vec![0],
         }
     }
 
@@ -222,7 +201,7 @@ impl From<Tile> for OptionalTile {
 #[derive(Default)]
 pub struct TileSelection {
     pub rotation: i32,
-    pub prototype: Option<TilePrototype>,
+    pub prototype: Option<Prototype>,
 }
 
 impl TileSelection {
@@ -259,8 +238,8 @@ impl Coordinates {
 pub struct RulesNeedUpdateEvent {}
 
 #[derive(Default, Debug, Clone)]
-pub struct Constraints {
-    pub constraints: HashMap<Orientation, HashSet<Tile>>,
+pub struct Allowed {
+    pub allowed: HashMap<Orientation, HashSet<Tile>>,
 }
 
 #[derive(Component, Default, Clone)]
@@ -272,8 +251,8 @@ pub struct Connectivity {
 pub struct Rules {
     pub width: usize,
     pub height: usize,
-    pub prototypes: Vec<TilePrototype>,
-    pub constraints: HashMap<Tile, Constraints>,
+    pub prototypes: Vec<Prototype>,
+    pub alloweds: HashMap<Tile, Allowed>,
 }
 
 impl FromWorld for Rules {
@@ -324,14 +303,14 @@ impl FromWorld for Rules {
         for index in 0..palette.len() {
             let elt = &palette[index];
             let model = asset_server.load(&elt.tile_model);
-            prototypes.push(TilePrototype::new(index, model, elt.equivalences))
+            prototypes.push(Prototype::new(index, model, elt.equivalences))
         }
 
         Self {
             width: 32,
             height: 32,
             prototypes,
-            constraints: Default::default(),
+            alloweds: Default::default(),
         }
     }
 }

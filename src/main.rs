@@ -339,10 +339,10 @@ fn get_tile_entity(map: &Vec<Vec<Entity>>, coordinates: &Coordinates) -> Option<
 }
 
 fn expand_with_rotations(
-    constraints: &HashMap<Tile, Constraints>,
-    prototypes: &Vec<TilePrototype>,
-) -> HashMap<Tile, Constraints> {
-    let mut expanded = HashMap::<Tile, Constraints>::new();
+    constraints: &HashMap<Tile, Allowed>,
+    prototypes: &Vec<Prototype>,
+) -> HashMap<Tile, Allowed> {
+    let mut expanded = HashMap::<Tile, Allowed>::new();
 
     for (tile, tile_constraints) in constraints.iter() {
         let prototype = &prototypes[tile.prototype_index];
@@ -350,9 +350,9 @@ fn expand_with_rotations(
             let rotated_tile = prototype.make_rotated_tile(tile.orientation, tile_rotations);
             let new_variant_constraints_entry = expanded.entry(rotated_tile).or_default();
 
-            for (orientation, allowed_values) in tile_constraints.constraints.iter() {
+            for (orientation, allowed_values) in tile_constraints.allowed.iter() {
                 let new_constraints_entry: &mut HashSet<Tile> = new_variant_constraints_entry
-                    .constraints
+                    .allowed
                     .entry(orientation.rotated(tile_rotations))
                     .or_default();
                 for allowed_tile in allowed_values.iter() {
@@ -364,8 +364,6 @@ fn expand_with_rotations(
             }
         }
     }
-
-    info!("{:#?}", expanded);
 
     expanded
 }
@@ -396,23 +394,19 @@ fn collapse(
         }
 
         // Store the rule connectivities as constraints
-        rules.constraints = HashMap::<Tile, Constraints>::new();
+        rules.alloweds = HashMap::<Tile, Allowed>::new();
         for x in 0..rule_width {
             for y in 0..rule_height {
                 let tile = &rule_tiles[x][y];
                 let coords = Coordinates::new(x as i32, y as i32);
                 if let Some(tile) = &tile.tile {
-                    let constraints = &mut rules
-                        .constraints
-                        .entry(tile.clone())
-                        .or_default()
-                        .constraints;
+                    let allowed = &mut rules.alloweds.entry(tile.clone()).or_default().allowed;
 
                     for orientation in Orientation::values() {
                         let neighbour_coords = orientation.offset(&coords);
                         let neighbour_tile = get_tile_prototype(&rule_tiles, &neighbour_coords);
                         if let Some(neighbour_tile) = neighbour_tile {
-                            constraints
+                            allowed
                                 .entry(orientation)
                                 .or_default()
                                 .insert(neighbour_tile);
@@ -421,11 +415,11 @@ fn collapse(
                 }
             }
         }
-        rules.constraints = expand_with_rotations(&rules.constraints, &rules.prototypes);
+        rules.alloweds = expand_with_rotations(&rules.alloweds, &rules.prototypes);
 
         // Reset to every possibilities on rule change
         let mut possible_tiles = HashSet::new();
-        for tile in rules.constraints.keys() {
+        for tile in rules.alloweds.keys() {
             possible_tiles.insert(tile.clone());
         }
         for (_, mut multi_tile_prototype, _) in tiles_query.iter_mut() {
@@ -502,12 +496,8 @@ fn collapse(
                     // Sum all the possible values for this neighbour given its own allowed values
                     let mut all_allowed_neighbour = HashSet::<Tile>::new();
                     for value in &propagating_wave {
-                        let rule_constraints = rules
-                            .constraints
-                            .get(value)
-                            .unwrap()
-                            .constraints
-                            .get(&orientation);
+                        let rule_constraints =
+                            rules.alloweds.get(value).unwrap().allowed.get(&orientation);
                         if let Some(allowed_neighbour) = rule_constraints {
                             all_allowed_neighbour.extend(allowed_neighbour);
                         }
