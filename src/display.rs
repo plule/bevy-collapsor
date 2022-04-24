@@ -1,6 +1,7 @@
 use crate::components::*;
 use bevy::prelude::*;
 use bevy_mod_picking::Hover;
+use num_traits::ToPrimitive;
 
 pub struct DisplayPlugin;
 
@@ -80,7 +81,9 @@ fn draw_map(
         let mut entity = commands.entity(entity);
         entity.despawn_descendants();
 
-        match multi_tile.tiles.len() {
+        let entropy = multi_tile.tiles.len();
+
+        match entropy {
             0 => {
                 entity.with_children(|tile| {
                     tile.spawn_bundle(PbrBundle {
@@ -104,9 +107,14 @@ fn draw_map(
             }
             _ => {
                 entity.with_children(|tile| {
+                    let mat_index = 10.0 * (1.0 - (entropy as f32) / (rules.alloweds.len() as f32));
+                    let mat_index = mat_index
+                        .to_usize()
+                        .unwrap()
+                        .min(models.undecided_mats.len() - 1);
                     tile.spawn_bundle(PbrBundle {
                         mesh: models.undecided_mesh.clone(),
-                        material: models.undecided_mat.clone(),
+                        material: models.undecided_mats[mat_index].clone(),
                         ..Default::default()
                     });
                 });

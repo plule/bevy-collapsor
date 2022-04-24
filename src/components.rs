@@ -28,7 +28,7 @@ pub struct ModelAssets {
     pub up_cube_mesh: Handle<Mesh>,
     pub up_cube_mat: Handle<StandardMaterial>,
     pub undecided_mesh: Handle<Mesh>,
-    pub undecided_mat: Handle<StandardMaterial>,
+    pub undecided_mats: Vec<Handle<StandardMaterial>>,
     pub impossible_mesh: Handle<Mesh>,
     pub impossible_mat: Handle<StandardMaterial>,
     pub pick_mesh: Handle<Mesh>,
@@ -47,7 +47,12 @@ impl FromWorld for ModelAssets {
             .get_resource_mut::<Assets<StandardMaterial>>()
             .unwrap();
         let up_cube_mat = materials.add(Color::RED.into());
-        let undecided_mat = materials.add(Color::BLACK.into());
+
+        let mut undecided_mats = Vec::new();
+        for i in 0..10 {
+            let level = i as f32 / 10.0;
+            undecided_mats.push(materials.add(Color::rgb(level, level, level).into()));
+        }
         let impossible_mat = materials.add(Color::RED.into());
         let pick_mat = materials.add(StandardMaterial {
             base_color: Color::WHITE,
@@ -58,7 +63,7 @@ impl FromWorld for ModelAssets {
             up_cube_mesh,
             up_cube_mat,
             undecided_mesh,
-            undecided_mat,
+            undecided_mats,
             impossible_mesh,
             impossible_mat,
             pick_mesh,
