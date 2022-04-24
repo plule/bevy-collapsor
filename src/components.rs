@@ -1,9 +1,26 @@
 use std::collections::{HashMap, HashSet};
 
-use bevy::prelude::*;
-use bevy_inspector_egui::Inspectable;
+use bevy::{ecs::event::Events, prelude::*};
+use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+
+pub struct ComponentsPlugin;
+
+impl Plugin for ComponentsPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(Events::<RulesNeedUpdateEvent>::default())
+            .init_resource::<ModelAssets>()
+            .init_resource::<TileSelection>()
+            .init_resource::<Rules>()
+            .register_inspectable::<Coordinates>()
+            .register_inspectable::<RuleTileTag>()
+            .register_inspectable::<PaletteTag>()
+            .register_inspectable::<Orientation>()
+            .register_inspectable::<Tile>()
+            .register_inspectable::<OptionalTile>();
+    }
+}
 
 pub struct ModelAssets {
     pub up_cube_mesh: Handle<Mesh>,
