@@ -9,7 +9,9 @@ pub struct WCFPlugin;
 
 impl Plugin for WCFPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(collapse).add_system(update_rules);
+        app.add_system(observe_system)
+            .add_system(collapse)
+            .add_system(update_rules);
     }
 }
 
@@ -111,93 +113,107 @@ fn update_rules(
     }
 }
 
-fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut TileSuperposition, &Connectivity)>) {
+fn observe_system(mut query: Query<(Entity, &mut TileSuperposition)>) {
     let mut rng = rand::thread_rng();
-
     // Find the smallest > 1 entropy
     let mut min_entropy_entities = Vec::new();
     let mut min_entropy = usize::MAX;
 
-    for (e, waves, _) in query.iter() {
-        let entropy = waves.tiles.len();
+    for (entity, wave) in query.iter() {
+        if wave.dirty {
+            // ongoing propagation
+            return;
+        }
+        let entropy = wave.tiles.len();
         if entropy < min_entropy && entropy > 1 {
             min_entropy = entropy;
             min_entropy_entities.clear();
         }
 
         if entropy == min_entropy {
-            min_entropy_entities.push(e);
+            min_entropy_entities.push(entity);
         }
     }
 
     let min_entropy_entity = match min_entropy_entities.choose(&mut rng) {
         Some(e) => *e,
+        // Solved or impossible
         None => return,
     };
 
-    let min_entropy_wave = &mut query
+    let mut min_entropy_wave = query
         .get_component_mut::<TileSuperposition>(min_entropy_entity)
-        .unwrap()
-        .tiles;
+        .unwrap();
 
     // Observe the tile with the smallest entropy
-    observe(min_entropy_wave, &mut rng);
+    let min_entropy_tiles: Vec<&Tile> = min_entropy_wave.tiles.iter().collect();
+    let observed = *min_entropy_tiles.choose(&mut rng).unwrap().clone();
+    min_entropy_wave.tiles.clear();
+    min_entropy_wave.tiles.insert(observed.clone());
 
-    // Propagate
-    let mut need_propagation = HashSet::new();
-    need_propagation.insert(min_entropy_entity);
-    while !need_propagation.is_empty() {
-        // Pop an entity needing propagation
-        let propagating_entity = need_propagation.iter().next().cloned().unwrap();
-        need_propagation.take(&propagating_entity).unwrap();
+    // Signal for propagation
+    min_entropy_wave.dirty = true;
+}
 
-        // Get all its allowed values and its connectivity
-        let (_, propagating_wave, propagating_connectivity) =
-            query.get(propagating_entity).unwrap();
-
-        if propagating_wave.tiles.is_empty() {
-            // Impossible to solve
-            // Avoid propagating it everywhere
-            // TODO forbid the observation
-            continue;
+fn collapse(rules: Res<Rules>, mut query: Query<(Entity, &mut TileSuperposition, &Connectivity)>) {
+    // Find a dirty wave
+    let mut propagating_entity = Option::<Entity>::default();
+    for (entity, wave, _) in query.iter() {
+        if wave.dirty {
+            propagating_entity = Some(entity);
+            break;
         }
+    }
 
-        let propagating_wave = propagating_wave.tiles.clone();
-        let propagating_connectivity = propagating_connectivity.connectivity.clone();
+    let propagating_entity = match propagating_entity {
+        Some(e) => e,
+        None => return,
+    };
 
-        // Find its neighbours
-        for orientation in Orientation::values() {
-            if let Some(neighbour) = propagating_connectivity.get(&orientation) {
-                // Sum all the possible values for this neighbour given its own allowed values
-                let mut all_allowed_neighbour = HashSet::<Tile>::new();
-                for value in &propagating_wave {
-                    let rule_constraints =
-                        rules.alloweds.get(value).unwrap().allowed.get(&orientation);
-                    if let Some(allowed_neighbour) = rule_constraints {
-                        all_allowed_neighbour.extend(allowed_neighbour);
-                    }
+    // Get all its allowed values and its connectivity
+    let (_, propagating_wave, propagating_connectivity) = query.get(propagating_entity).unwrap();
+
+    let propagating_wave = propagating_wave.tiles.clone();
+    let propagating_connectivity = propagating_connectivity.connectivity.clone();
+
+    // Find its neighbours
+    for orientation in Orientation::values() {
+        if let Some(neighbour) = propagating_connectivity.get(&orientation) {
+            let neighbour_wave = &mut query
+                .get_component_mut::<TileSuperposition>(*neighbour)
+                .unwrap();
+
+            // Skip if the neighbour is already resolved or impossible
+            if neighbour_wave.tiles.len() <= 1 {
+                continue;
+            }
+
+            // Sum all the possible values for this neighbour given its own allowed values
+            let mut all_allowed_neighbour = HashSet::<Tile>::new();
+            for value in &propagating_wave {
+                let rule_constraints = rules.alloweds.get(value).unwrap().allowed.get(&orientation);
+                if let Some(allowed_neighbour) = rule_constraints {
+                    all_allowed_neighbour.extend(allowed_neighbour);
                 }
+            }
 
-                // Intersect the previous list of allowed values with the new constraints
-                let neighbour_wave = &mut query
-                    .get_component_mut::<TileSuperposition>(*neighbour)
-                    .unwrap();
-                let neighbour_wave = &mut neighbour_wave.tiles;
-                let new_allowed_values = intersection(all_allowed_neighbour, neighbour_wave);
+            // Intersect the previous list of allowed values with the new constraints
+            let new_allowed_values = intersection(all_allowed_neighbour, &mut neighbour_wave.tiles);
 
-                // If impacted, update the tile and add it to the list needing propagation
-                if &new_allowed_values != neighbour_wave {
-                    need_propagation.insert(*neighbour);
-                    *neighbour_wave = new_allowed_values;
+            // If impacted, update the tile and mark it as dirty for propagation
+            if &new_allowed_values != &neighbour_wave.tiles {
+                neighbour_wave.tiles = new_allowed_values;
+                if !neighbour_wave.tiles.is_empty() {
+                    // Don't propagate impossibility
+                    neighbour_wave.dirty = true;
                 }
             }
         }
     }
-}
 
-fn observe(wave: &mut HashSet<Tile>, rng: &mut rand::prelude::ThreadRng) {
-    let tile_vec: Vec<&Tile> = wave.iter().collect();
-    let observed = *tile_vec.choose(rng).unwrap().clone();
-    wave.clear();
-    wave.insert(observed.clone());
+    // Mark the entity as not dirty
+    let mut wave = query
+        .get_component_mut::<TileSuperposition>(propagating_entity)
+        .unwrap();
+    wave.dirty = false;
 }

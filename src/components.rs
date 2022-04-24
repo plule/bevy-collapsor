@@ -201,7 +201,11 @@ impl OptionalTile {
 /// If it's zero, then it's impossible.
 #[derive(Default, Component, Clone, PartialEq, Eq, Debug)]
 pub struct TileSuperposition {
+    /// Possible superpositions
     pub tiles: HashSet<Tile>,
+
+    /// True if impacted by an ongoing propagation
+    pub dirty: bool,
 }
 
 #[derive(Default, Component, Inspectable, Clone, PartialEq)]
