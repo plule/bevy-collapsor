@@ -370,27 +370,23 @@ fn expand_with_rotations(
 ) -> HashMap<TilePrototype, Constraints> {
     let mut expanded = HashMap::<TilePrototype, Constraints>::new();
     for (tile, tile_constraints) in constraints.iter() {
-        for equivalent_tile in tile.equivalences() {
-            for variant in 0..Orientation::values().len() as i32 {
-                let new_variant_constraints_entry = expanded
-                    .entry(equivalent_tile.rotated(variant))
-                    .or_default();
+        for tile_rotations in 0..Orientation::values().len() as i32 {
+            let new_variant_constraints_entry =
+                expanded.entry(tile.rotated(tile_rotations)).or_default();
 
-                for (orientation, allowed_values) in tile_constraints.constraints.iter() {
-                    let new_constraints_entry: &mut HashSet<TilePrototype> =
-                        new_variant_constraints_entry
-                            .constraints
-                            .entry(orientation.rotated(variant))
-                            .or_default();
-                    for allowed_tile in allowed_values.iter() {
-                        for equivalent_allowed_tile in allowed_tile.equivalences() {
-                            new_constraints_entry.insert(equivalent_allowed_tile.rotated(variant));
-                        }
-                    }
+            for (orientation, allowed_values) in tile_constraints.constraints.iter() {
+                let new_constraints_entry: &mut HashSet<TilePrototype> =
+                    new_variant_constraints_entry
+                        .constraints
+                        .entry(orientation.rotated(tile_rotations))
+                        .or_default();
+                for allowed_tile in allowed_values.iter() {
+                    new_constraints_entry.insert(allowed_tile.rotated(tile_rotations));
                 }
             }
         }
     }
+
     expanded
 }
 
@@ -596,7 +592,7 @@ fn on_mouse_wheel(
     let selected_tile = &mut selected_tile.tile_prototype;
     if let Some(selected_tile) = &mut selected_tile.tile_prototype {
         for event in mouse_wheel_events.iter() {
-            selected_tile.orientation.rotate(event.y as i32);
+            selected_tile.rotate(event.y as i32);
         }
     }
 }

@@ -102,11 +102,34 @@ impl TilePrototype {
         }
     }
 
+    pub fn rotate(&mut self, amount: i32) {
+        self.orientation.rotate(amount);
+
+        // Take in account the equivalences. There is likely a smart way to do that but oh well
+        self.orientation = match self.equivalences {
+            Equivalences::None => self.orientation,
+            Equivalences::HalfTurn => match self.orientation {
+                Orientation::North => Orientation::North,
+                Orientation::East => Orientation::East,
+                Orientation::South => Orientation::North,
+                Orientation::West => Orientation::East,
+            },
+            Equivalences::QuarterTurn => Orientation::North,
+        }
+    }
+
     pub fn rotated(&self, amount: i32) -> Self {
-        TilePrototype {
-            model_index: self.model_index,
-            orientation: self.orientation.rotated(amount),
-            equivalences: self.equivalences,
+        let mut ret = self.clone();
+        ret.rotate(amount);
+        ret
+    }
+
+    /// Get the list of rotations, skipping the equivalences
+    pub fn rotations(&self) -> Vec<i32> {
+        match self.equivalences {
+            Equivalences::None => vec![0],
+            Equivalences::HalfTurn => vec![0, 2],
+            Equivalences::QuarterTurn => vec![0, 1, 2, 3],
         }
     }
 
