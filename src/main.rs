@@ -54,6 +54,8 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
         })
         .insert_bundle(PickingCameraBundle::default())
         .with_children(|camera| {
+            let rules_width = 16;
+            let rules_height = 16;
             // UI
             camera
                 .spawn_bundle(TransformBundle::from(
@@ -71,6 +73,8 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                             for i in 0..rules.prototypes.len() {
                                 let prototype = &rules.prototypes[i];
                                 let model = prototype.model.clone();
+                                let x = i as i32 % rules_width;
+                                let y = -(i as i32 / rules_height) - 2;
                                 palette
                                     .spawn_bundle(PbrBundle {
                                         material: models.pick_mat.clone(),
@@ -80,7 +84,7 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                                     .insert_bundle(PickableBundle::default())
                                     .insert_bundle((
                                         Name::from(format!("tile proto {i}")),
-                                        Coordinates::new(i as i32, -1),
+                                        Coordinates::new(x, y),
                                         Tile::new(i, Orientation::North),
                                         PaletteTag {},
                                     ))
@@ -102,8 +106,8 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                     ui.spawn_bundle(TransformBundle::default())
                         .insert(Name::from("rule_map"))
                         .with_children(|rule_map| {
-                            for x in 0..16 {
-                                for y in 0..16 {
+                            for x in 0..rules_width {
+                                for y in 0..rules_height {
                                     rule_map
                                         .spawn_bundle(PbrBundle {
                                             material: models.pick_mat.clone(),
