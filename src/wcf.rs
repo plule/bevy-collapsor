@@ -218,10 +218,11 @@ fn collapse(
                 // Sum all the possible values for this neighbour given its own allowed values
                 let mut all_allowed_neighbour = HashSet::<Tile>::new();
                 for value in &propagating_wave {
-                    let rule_constraints =
-                        rules.alloweds.get(value).unwrap().allowed.get(&orientation);
-                    if let Some(allowed_neighbour) = rule_constraints {
-                        all_allowed_neighbour.extend(allowed_neighbour);
+                    // Skip cases where there is a contradiction
+                    if let Some(allowed_list) = rules.alloweds.get(value) {
+                        if let Some(allowed_neighbour) = allowed_list.allowed.get(&orientation) {
+                            all_allowed_neighbour.extend(allowed_neighbour);
+                        }
                     }
                 }
 

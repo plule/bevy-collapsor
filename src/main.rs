@@ -50,14 +50,12 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
     });
 
     commands
-        .spawn_bundle(TransformBundle::from_transform(Transform::from_xyz(
-            0.0, 0.0, 6.0,
-        )))
+        .spawn_bundle(TransformBundle::default())
         .insert_bundle((Name::from("camera"), CameraHoldTag::default()))
         .with_children(|commands| {
             commands
                 .spawn_bundle(PerspectiveCameraBundle {
-                    transform: Transform::from_xyz(0.0, 20.0, 20.0)
+                    transform: Transform::from_xyz(0.0, 10.0, 30.0)
                         .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
                     ..default()
                 })

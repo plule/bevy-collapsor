@@ -149,6 +149,6 @@ fn animate_light_direction(
 
 fn animate_camera(time: Res<Time>, mut query: Query<&mut Transform, With<CameraHoldTag>>) {
     for mut transform in query.iter_mut() {
-        transform.rotation = Quat::from_rotation_y(time.seconds_since_startup() as f32 / 100.0);
+        transform.rotation = Quat::from_rotation_y(time.seconds_since_startup() as f32 / 50.0);
     }
 }
