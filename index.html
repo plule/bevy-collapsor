@@ -1,46 +1,51 @@
+<!DOCTYPE html>
 <html>
 
-<head>
-    <meta charset="UTF-8" />
-    <style>
-        body {
-            margin: 0;
-            background: linear-gradient(-45deg, #a6a6a6, #5ac05a, #262626, #a6a6a6);
-            background-size: 400% 400%;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+<body>
 
-        canvas {
-            background-color: white;
-        }
-
-        @keyframes gradient {
-            0% {
-                background-position: 0% 50%;
+    <head>
+        <meta charset="UTF-8" />
+        <style>
+            body {
+                margin: 0;
+                background: linear-gradient(-45deg, #a6a6a6, #5ac05a, #262626, #a6a6a6);
+                background-size: 400% 400%;
+                height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
             }
 
-            50% {
-                background-position: 100% 50%;
+            canvas {
+                background-color: white;
             }
 
-            100% {
-                background-position: 0% 50%;
+            @keyframes gradient {
+                0% {
+                    background-position: 0% 50%;
+                }
+
+                50% {
+                    background-position: 100% 50%;
+                }
+
+                100% {
+                    background-position: 0% 50%;
+                }
             }
-        }
-    </style>
-</head>
-<script>
-    document.body.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    });
-</script>
-<script type="module">
-    import init from './bevy-collapsor.js'
-    init()
-</script>
+        </style>
+    </head>
+    <script>
+        document.body.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    </script>
+    <script type="module">
+        import init from './bevy-collapsor.js'
+        init()
+    </script>
+
+</body>
 
 </html>
