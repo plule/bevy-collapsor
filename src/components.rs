@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use bevy::{ecs::event::Events, prelude::*};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
@@ -14,6 +14,7 @@ impl Plugin for ComponentsPlugin {
             .init_resource::<TileSelection>()
             .init_resource::<Rules>()
             .init_resource::<Tuning>()
+            .init_resource::<GuessHistory>()
             .register_inspectable::<Tuning>()
             .register_inspectable::<Coordinates>()
             .register_inspectable::<RuleTileTag>()
@@ -215,6 +216,19 @@ pub struct TileSuperposition {
     pub dirty: bool,
 }
 
+/// History of attempts for backtracking purpose
+#[derive(Default, Component, Clone, PartialEq, Eq, Debug)]
+pub struct TileSuperpositionHistory {
+    pub history: VecDeque<HashSet<Tile>>,
+}
+
+/// History of guesses for backtracking purpose
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
+pub struct GuessHistory {
+    // History of guesses
+    pub history: VecDeque<(Entity, Tile)>,
+}
+
 #[derive(Default, Component, Inspectable, Clone, PartialEq)]
 pub struct DrawTile {
     pub tile: OptionalTile,
@@ -279,12 +293,16 @@ pub struct Connectivity {
 pub struct Tuning {
     #[inspectable(min = 1)]
     pub collapse_per_frame: usize,
+
+    #[inspectable(min = 0)]
+    pub backtrack_history_size: usize,
 }
 
 impl Default for Tuning {
     fn default() -> Self {
         Self {
             collapse_per_frame: 100,
+            backtrack_history_size: 10,
         }
     }
 }

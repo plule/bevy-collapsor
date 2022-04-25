@@ -144,6 +144,7 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                             Name::from(format!("{x}:{y}")),
                             Coordinates::new(x as i32, y as i32),
                             TileSuperposition::default(),
+                            TileSuperpositionHistory::default(),
                         ))
                         .id();
                     map_entities[x][y] = entity;

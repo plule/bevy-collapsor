@@ -110,7 +110,7 @@ fn draw_map(
                     let mat_index = 10.0 * (1.0 - (entropy as f32) / (rules.alloweds.len() as f32));
                     let mat_index = mat_index
                         .to_usize()
-                        .unwrap()
+                        .unwrap_or(0)
                         .min(models.undecided_mats.len() - 1);
                     tile.spawn_bundle(PbrBundle {
                         mesh: models.undecided_mesh.clone(),

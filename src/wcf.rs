@@ -11,7 +11,9 @@ impl Plugin for WCFPlugin {
     fn build(&self, app: &mut App) {
         app.add_system(observe_system)
             .add_system(collapse)
-            .add_system(update_rules);
+            .add_system(update_rules)
+            .add_system(prune_guess_history)
+            .add_system(backtrack);
     }
 }
 
@@ -113,13 +115,20 @@ fn update_rules(
     }
 }
 
-fn observe_system(mut query: Query<(Entity, &mut TileSuperposition)>) {
+fn observe_system(
+    mut query: Query<(
+        Entity,
+        &mut TileSuperposition,
+        &mut TileSuperpositionHistory,
+    )>,
+    mut history: ResMut<GuessHistory>,
+) {
     let mut rng = rand::thread_rng();
     // Find the smallest > 1 entropy
     let mut min_entropy_entities = Vec::new();
     let mut min_entropy = usize::MAX;
 
-    for (entity, wave) in query.iter() {
+    for (entity, wave, _) in query.iter() {
         if wave.dirty {
             // ongoing propagation
             return;
@@ -141,13 +150,25 @@ fn observe_system(mut query: Query<(Entity, &mut TileSuperposition)>) {
         None => return,
     };
 
-    let mut min_entropy_wave = query
+    let min_entropy_wave = query
         .get_component_mut::<TileSuperposition>(min_entropy_entity)
-        .unwrap();
+        .unwrap()
+        .clone();
 
     // Observe the tile with the smallest entropy
     let min_entropy_tiles: Vec<&Tile> = min_entropy_wave.tiles.iter().collect();
     let observed = *min_entropy_tiles.choose(&mut rng).unwrap().clone();
+
+    // Save the current state and this guess in the tiles history
+    history.history.push_front((min_entropy_entity, observed));
+    for (_, wave, mut wave_history) in query.iter_mut() {
+        wave_history.history.push_front(wave.tiles.clone());
+    }
+
+    // Observe the tile
+    let mut min_entropy_wave = query
+        .get_component_mut::<TileSuperposition>(min_entropy_entity)
+        .unwrap();
     min_entropy_wave.tiles.clear();
     min_entropy_wave.tiles.insert(observed.clone());
 
@@ -225,4 +246,59 @@ fn collapse(
             .unwrap();
         wave.dirty = false;
     }
+}
+
+fn prune_guess_history(
+    mut query: Query<&mut TileSuperpositionHistory>,
+    mut history: ResMut<GuessHistory>,
+    tuning: Res<Tuning>,
+) {
+    if history.history.len() <= tuning.backtrack_history_size {
+        return;
+    }
+
+    history.history.pop_back();
+
+    for mut tile_history in query.iter_mut() {
+        tile_history.history.pop_back();
+    }
+}
+
+fn backtrack(
+    mut query: Query<(&mut TileSuperposition, &mut TileSuperpositionHistory)>,
+    mut history: ResMut<GuessHistory>,
+) {
+    if history.history.len() == 0 {
+        return;
+    }
+
+    // Find if a contradiction occured
+    let mut contradiction = false;
+    for (wave, _) in query.iter() {
+        if wave.tiles.len() == 0 {
+            contradiction = true;
+            break;
+        }
+    }
+
+    if !contradiction {
+        return;
+    }
+
+    info!("Contradiction detected, backtracking");
+
+    // Restore the previous state
+    for (mut wave, mut wave_history) in query.iter_mut() {
+        // TODO: better link between the global and individual history
+        let previous = wave_history.history.pop_front().unwrap();
+        wave.tiles = previous;
+        wave.dirty = false;
+    }
+
+    // Exclude the bad guess
+    let (entity, bad_guess) = history.history.pop_front().unwrap();
+    let mut wave = query
+        .get_component_mut::<TileSuperposition>(entity)
+        .unwrap();
+    wave.tiles.remove(&bad_guess);
 }
