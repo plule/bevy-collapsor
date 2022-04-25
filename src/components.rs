@@ -4,6 +4,7 @@ use bevy::{ecs::event::Events, prelude::*};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use serde::{Deserialize, Serialize};
 
 pub struct ComponentsPlugin;
 
@@ -90,7 +91,9 @@ impl Default for Equivalences {
     }
 }
 
-#[derive(Inspectable, Clone, Copy, PartialEq, FromPrimitive, Hash, Eq, Debug)]
+#[derive(
+    Inspectable, Clone, Copy, PartialEq, FromPrimitive, Hash, Eq, Debug, Serialize, Deserialize,
+)]
 pub enum Orientation {
     North = 0,
     East,
@@ -180,7 +183,9 @@ impl Prototype {
     }
 }
 
-#[derive(Default, Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug)]
+#[derive(
+    Default, Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug, Serialize, Deserialize,
+)]
 pub struct Tile {
     pub prototype_index: usize,
     pub orientation: Orientation,
@@ -195,7 +200,7 @@ impl Tile {
     }
 }
 
-#[derive(Default, Component, Inspectable, Clone, PartialEq)]
+#[derive(Default, Component, Inspectable, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OptionalTile {
     pub tile: Option<Tile>,
 }

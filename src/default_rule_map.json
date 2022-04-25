@@ -1,0 +1,936 @@
+{
+  "map": [
+    [
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 1,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": {
+          "prototype_index": 20,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 20,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 20,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 0,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 20,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": {
+          "prototype_index": 20,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 18,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "East"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "East"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 1,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "East"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": {
+          "prototype_index": 18,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 16,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 1,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": {
+          "prototype_index": 18,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 16,
+          "orientation": "West"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 3,
+          "orientation": "North"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "East"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 1,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "East"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 21,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 18,
+          "orientation": "South"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 1,
+          "orientation": "East"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": {
+          "prototype_index": 18,
+          "orientation": "East"
+        }
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ],
+    [
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      },
+      {
+        "tile": null
+      }
+    ]
+  ]
+}

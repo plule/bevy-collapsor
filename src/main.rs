@@ -7,27 +7,32 @@ use bevy_mod_picking::*;
 
 mod components;
 use components::*;
+use serde::{Deserialize, Serialize};
 mod display;
 mod input;
 mod wcf;
 fn main() {
-    App::new()
-        .add_plugins_with(DefaultPlugins, |group| {
-            group.add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin)
-        })
-        .add_plugin(WorldInspectorPlugin::new())
-        .add_plugin(InspectorPlugin::<Tuning>::new())
-        .add_plugins(DefaultPickingPlugins)
-        .add_plugin(components::ComponentsPlugin)
-        .add_plugin(wcf::WCFPlugin)
-        .add_plugin(display::DisplayPlugin)
-        .add_plugin(input::InputPlugin)
-        .add_startup_system(setup)
-        .insert_resource(AmbientLight {
-            color: Color::WHITE,
-            brightness: 1.0 / 5.0f32,
-        })
-        .run();
+    let mut app = App::new();
+
+    app.add_plugins_with(DefaultPlugins, |group| {
+        group.add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin)
+    })
+    .add_plugin(WorldInspectorPlugin::new())
+    .add_plugin(InspectorPlugin::<Tuning>::new())
+    .add_plugins(DefaultPickingPlugins)
+    .add_plugin(components::ComponentsPlugin)
+    .add_plugin(wcf::WCFPlugin)
+    .add_plugin(display::DisplayPlugin)
+    .add_plugin(input::InputPlugin)
+    .add_startup_system(setup)
+    .insert_resource(AmbientLight {
+        color: Color::WHITE,
+        brightness: 1.0 / 5.0f32,
+    });
+
+    #[cfg(feature = "save_rule_map")]
+    app.add_system(save_rules);
+    app.run();
 }
 
 fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
@@ -108,11 +113,15 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                                 });
 
                             // Rule map
+                            let map_json = include_str!("default_rule_map.json");
+                            let map: MapRule = serde_json::from_str(map_json).unwrap();
+
                             ui.spawn_bundle(TransformBundle::default())
                                 .insert(Name::from("rule_map"))
                                 .with_children(|rule_map| {
                                     for x in 0..rules_width {
                                         for y in 0..rules_height {
+                                            let tile = &map.map[x as usize][y as usize];
                                             rule_map
                                                 .spawn_bundle(PbrBundle {
                                                     material: models.pick_mat.clone(),
@@ -122,7 +131,7 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                                                 .insert_bundle((
                                                     Name::from(format!("{x}:{y}")),
                                                     Coordinates::new(x as i32, y as i32),
-                                                    OptionalTile::default(),
+                                                    tile.clone(),
                                                     DrawTile::default(),
                                                     RuleTileTag::default(),
                                                 ))
@@ -187,4 +196,29 @@ fn get_tile_entity(map: &Vec<Vec<Entity>>, coordinates: &Coordinates) -> Option<
     let line = map.get(coordinates.x as usize)?;
     let tile = line.get(coordinates.y as usize)?;
     Some(tile.clone())
+}
+
+#[derive(Serialize, Deserialize)]
+struct MapRule {
+    pub map: Vec<Vec<OptionalTile>>,
+}
+
+#[cfg(feature = "save_rule_map")]
+fn save_rules(
+    rules_query: Query<(&OptionalTile, &Coordinates), With<RuleTileTag>>,
+    mut event_reader: EventReader<RulesNeedUpdateEvent>,
+) {
+    for _ in event_reader.iter() {
+        // Read the rule map
+        let rule_width = 16;
+        let rule_height = 16;
+        let mut rule_tiles = vec![vec![OptionalTile::default(); rule_width]; rule_height];
+        for (tile, coordinates) in rules_query.iter() {
+            rule_tiles[coordinates.x as usize][coordinates.y as usize] = tile.clone();
+        }
+        let map = MapRule { map: rule_tiles };
+
+        let serialized = serde_json::to_string_pretty(&map).unwrap();
+        std::fs::write("src/default_rule_map.json", serialized).unwrap();
+    }
 }

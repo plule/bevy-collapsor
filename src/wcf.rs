@@ -67,8 +67,7 @@ fn update_rules(
     mut event_reader: EventReader<RulesNeedUpdateEvent>,
     mut tiles_query: Query<(Entity, &mut TileSuperposition, &Connectivity)>,
 ) {
-    if !event_reader.is_empty() {
-        info!("Rules changed, clearing");
+    if !event_reader.is_empty() || rules.is_added() {
         for _ in event_reader.iter() {}
         // Rule change
 

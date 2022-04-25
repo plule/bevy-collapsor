@@ -225,6 +225,8 @@ dependencies = [
  "num-derive",
  "num-traits",
  "rand",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
