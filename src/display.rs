@@ -12,7 +12,8 @@ impl Plugin for DisplayPlugin {
             .add_system(draw_map)
             .add_system(apply_coordinate)
             .add_system(animate_light_direction)
-            .add_system(animate_camera);
+            .add_system(animate_camera)
+            .add_system(update_map_visibility);
     }
 }
 
@@ -150,5 +151,42 @@ fn animate_light_direction(
 fn animate_camera(time: Res<Time>, mut query: Query<&mut Transform, With<CameraHoldTag>>) {
     for mut transform in query.iter_mut() {
         transform.rotation = Quat::from_rotation_y(time.seconds_since_startup() as f32 / 50.0);
+    }
+}
+
+fn set_visible_recursive(
+    is_visible: bool,
+    entity: Entity,
+    visible_query: &mut Query<&mut Visibility>,
+    children_query: &Query<&Children>,
+) {
+    if let Ok(mut visible) = visible_query.get_mut(entity) {
+        visible.is_visible = is_visible;
+    }
+
+    if let Ok(children) = children_query.get(entity) {
+        for child in children.iter() {
+            set_visible_recursive(is_visible, *child, visible_query, children_query);
+        }
+    }
+}
+
+fn update_map_visibility(
+    palette_holder_query: Query<Entity, With<RuleMapTag>>,
+    tuning: Res<Tuning>,
+    children_query: Query<&Children>,
+    mut visible_query: Query<&mut Visibility>,
+) {
+    if !tuning.is_changed() {
+        return;
+    }
+
+    if let Ok(palette_holder) = palette_holder_query.get_single() {
+        set_visible_recursive(
+            tuning.show_rulemap,
+            palette_holder,
+            &mut visible_query,
+            &children_query,
+        );
     }
 }

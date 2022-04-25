@@ -77,6 +77,9 @@ impl FromWorld for ModelAssets {
 #[derive(Component, Inspectable, Default)]
 pub struct CameraHoldTag;
 
+#[derive(Component, Inspectable, Default)]
+pub struct RuleMapTag;
+
 /// Variation of the palette elements that are equivalents
 #[derive(Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub enum Equivalences {
@@ -299,16 +302,20 @@ pub struct Connectivity {
 
 #[derive(Component, Inspectable)]
 pub struct Tuning {
-    #[inspectable(min = 1)]
+    #[inspectable(label = "show rule map")]
+    pub show_rulemap: bool,
+
+    #[inspectable(label = "speed", min = 1)]
     pub collapse_per_frame: usize,
 
-    #[inspectable(min = 0)]
+    #[inspectable(label = "backtrack history size", min = 0)]
     pub backtrack_history_size: usize,
 }
 
 impl Default for Tuning {
     fn default() -> Self {
         Self {
+            show_rulemap: true,
             collapse_per_frame: 100,
             backtrack_history_size: 100,
         }

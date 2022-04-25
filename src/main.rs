@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 use bevy_embedded_assets::EmbeddedAssetPlugin;
-use bevy_inspector_egui::{InspectorPlugin, WorldInspectorPlugin};
+use bevy_inspector_egui::InspectorPlugin;
 use bevy_mod_picking::*;
 
 mod components;
@@ -17,7 +17,6 @@ fn main() {
     app.add_plugins_with(DefaultPlugins, |group| {
         group.add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin)
     })
-    .add_plugin(WorldInspectorPlugin::new())
     .add_plugin(InspectorPlugin::<Tuning>::new())
     .add_plugins(DefaultPickingPlugins)
     .add_plugin(components::ComponentsPlugin)
@@ -76,7 +75,7 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                                 .with_translation(Vec3::new(-1.4, -0.2, -2.0))
                                 .with_scale(Vec3::new(0.04, 0.04, 0.04)),
                         ))
-                        .insert(Name::from("ui"))
+                        .insert_bundle((Name::from("ui"), RuleMapTag::default()))
                         .with_children(|ui| {
                             // Palette
                             ui.spawn_bundle(TransformBundle::default())
