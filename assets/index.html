@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -32,15 +33,20 @@
         }
     </style>
 </head>
-<script>
-    document.body.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    });
-</script>
-<script type="module">
-    import init from './bevy-collapsor.js'
-    init()
-</script>
+
+<body>
+
+    <script>
+        document.body.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    </script>
+    <script type="module">
+        import init from './bevy-collapsor.js'
+        init()
+    </script>
+
+</body>
 
 </html>
