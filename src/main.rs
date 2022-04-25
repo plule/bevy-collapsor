@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
+use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_inspector_egui::{InspectorPlugin, WorldInspectorPlugin};
 use bevy_mod_picking::*;
 
@@ -11,7 +12,9 @@ mod input;
 mod wcf;
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins_with(DefaultPlugins, |group| {
+            group.add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin)
+        })
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(InspectorPlugin::<Tuning>::new())
         .add_plugins(DefaultPickingPlugins)

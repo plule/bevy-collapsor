@@ -220,6 +220,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy-inspector-egui",
+ "bevy_embedded_assets",
  "bevy_mod_picking",
  "num-derive",
  "num-traits",
@@ -456,6 +457,16 @@ dependencies = [
  "webbrowser",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "bevy_embedded_assets"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c296de13530f115dcfb1adca69c14dd3ccbee5a9e2880b84b07f56c8bc863a68"
+dependencies = [
+ "bevy",
+ "cargo-emit",
 ]
 
 [[package]]
@@ -963,6 +974,12 @@ name = "cache-padded"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
+
+[[package]]
+name = "cargo-emit"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1582e1c9e755dd6ad6b224dcffb135d199399a4568d454bd89fe515ca8425695"
 
 [[package]]
 name = "cargo-manifest"

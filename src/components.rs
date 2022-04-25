@@ -319,64 +319,31 @@ impl FromWorld for Rules {
     fn from_world(world: &mut World) -> Self {
         let asset_server = world.get_resource::<AssetServer>().unwrap();
         let palette = vec![
-            PaletteElement::new(
-                "models/bridge_center_wood.glb#Scene0",
-                Equivalences::HalfTurn,
-            ),
-            PaletteElement::new("models/bridge_side_wood.glb#Scene0", Equivalences::None),
-            PaletteElement::new("models/bridge_wood.glb#Scene0", Equivalences::HalfTurn),
-            PaletteElement::new("models/ground_grass.glb#Scene0", Equivalences::QuarterTurn),
-            PaletteElement::new("models/ground_pathBend.glb#Scene0", Equivalences::None),
-            PaletteElement::new(
-                "models/ground_pathCross.glb#Scene0",
-                Equivalences::QuarterTurn,
-            ),
-            PaletteElement::new("models/ground_pathCorner.glb#Scene0", Equivalences::None),
-            PaletteElement::new(
-                "models/ground_pathCornerSmall.glb#Scene0",
-                Equivalences::None,
-            ),
-            PaletteElement::new("models/ground_pathEndClosed.glb#Scene0", Equivalences::None),
-            PaletteElement::new(
-                "models/ground_pathOpen.glb#Scene0",
-                Equivalences::QuarterTurn,
-            ),
-            PaletteElement::new("models/ground_pathSide.glb#Scene0", Equivalences::None),
-            PaletteElement::new("models/ground_pathSideOpen.glb#Scene0", Equivalences::None),
-            PaletteElement::new("models/ground_pathSplit.glb#Scene0", Equivalences::None),
-            PaletteElement::new(
-                "models/ground_pathStraight.glb#Scene0",
-                Equivalences::HalfTurn,
-            ),
-            PaletteElement::new(
-                "models/ground_pathTile.glb#Scene0",
-                Equivalences::QuarterTurn,
-            ),
-            PaletteElement::new("models/ground_riverBendBank.glb#Scene0", Equivalences::None),
-            PaletteElement::new("models/ground_riverCorner.glb#Scene0", Equivalences::None),
-            PaletteElement::new(
-                "models/ground_riverCross.glb#Scene0",
-                Equivalences::QuarterTurn,
-            ),
-            PaletteElement::new(
-                "models/ground_riverCornerSmall.glb#Scene0",
-                Equivalences::None,
-            ),
-            PaletteElement::new(
-                "models/ground_riverEndClosed.glb#Scene0",
-                Equivalences::None,
-            ),
-            PaletteElement::new(
-                "models/ground_riverOpen.glb#Scene0",
-                Equivalences::QuarterTurn,
-            ),
-            PaletteElement::new("models/ground_riverSide.glb#Scene0", Equivalences::None),
-            PaletteElement::new("models/ground_riverSideOpen.glb#Scene0", Equivalences::None),
-            PaletteElement::new("models/ground_riverSplit.glb#Scene0", Equivalences::None),
-            PaletteElement::new(
-                "models/ground_riverStraight.glb#Scene0",
-                Equivalences::HalfTurn,
-            ),
+            PaletteElement::new("bridge_center_wood.glb#Scene0", Equivalences::HalfTurn),
+            PaletteElement::new("bridge_side_wood.glb#Scene0", Equivalences::None),
+            PaletteElement::new("bridge_wood.glb#Scene0", Equivalences::HalfTurn),
+            PaletteElement::new("ground_grass.glb#Scene0", Equivalences::QuarterTurn),
+            PaletteElement::new("ground_pathBend.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_pathCross.glb#Scene0", Equivalences::QuarterTurn),
+            PaletteElement::new("ground_pathCorner.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_pathCornerSmall.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_pathEndClosed.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_pathOpen.glb#Scene0", Equivalences::QuarterTurn),
+            PaletteElement::new("ground_pathSide.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_pathSideOpen.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_pathSplit.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_pathStraight.glb#Scene0", Equivalences::HalfTurn),
+            PaletteElement::new("ground_pathTile.glb#Scene0", Equivalences::QuarterTurn),
+            PaletteElement::new("ground_riverBendBank.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_riverCorner.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_riverCross.glb#Scene0", Equivalences::QuarterTurn),
+            PaletteElement::new("ground_riverCornerSmall.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_riverEndClosed.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_riverOpen.glb#Scene0", Equivalences::QuarterTurn),
+            PaletteElement::new("ground_riverSide.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_riverSideOpen.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_riverSplit.glb#Scene0", Equivalences::None),
+            PaletteElement::new("ground_riverStraight.glb#Scene0", Equivalences::HalfTurn),
         ];
 
         let mut prototypes = Vec::new();
