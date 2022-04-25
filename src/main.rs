@@ -72,8 +72,8 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                         .spawn_bundle(TransformBundle::from(
                             Transform::identity()
                                 .looking_at(Vec3::Y, Vec3::Z)
-                                .with_translation(Vec3::new(-1.4, -0.2, -2.0))
-                                .with_scale(Vec3::new(0.04, 0.04, 0.04)),
+                                .with_translation(Vec3::new(-1.4, -0.05, -2.0))
+                                .with_scale(Vec3::new(0.05, 0.05, 0.05)),
                         ))
                         .insert_bundle((Name::from("ui"), RuleMapTag::default()))
                         .with_children(|ui| {
@@ -101,7 +101,8 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
                                             ))
                                             .with_children(|tile| {
                                                 tile.spawn_bundle((
-                                                    Transform::from_xyz(0.0, 0.2, 0.0),
+                                                    Transform::from_xyz(0.0, 0.2, 0.0)
+                                                        .with_scale(Vec3::new(0.9, 0.9, 0.9)),
                                                     GlobalTransform::default(),
                                                 ))
                                                 .with_children(|tile| {
