@@ -50,8 +50,8 @@ impl FromWorld for ModelAssets {
         let up_cube_mat = materials.add(Color::RED.into());
 
         let mut undecided_mats = Vec::new();
-        for i in 0..10 {
-            let level = i as f32 / 10.0;
+        for i in 0..100 {
+            let level = i as f32 / 100.0;
             undecided_mats.push(materials.add(Color::rgb(level, level, level).into()));
         }
         let impossible_mat = materials.add(Color::RED.into());
@@ -302,7 +302,7 @@ impl Default for Tuning {
     fn default() -> Self {
         Self {
             collapse_per_frame: 100,
-            backtrack_history_size: 10,
+            backtrack_history_size: 100,
         }
     }
 }

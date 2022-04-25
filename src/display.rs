@@ -107,7 +107,8 @@ fn draw_map(
             }
             _ => {
                 entity.with_children(|tile| {
-                    let mat_index = 10.0 * (1.0 - (entropy as f32) / (rules.alloweds.len() as f32));
+                    let mat_index =
+                        100.0 * (1.0 - (entropy as f32) / (rules.alloweds.len() as f32));
                     let mat_index = mat_index
                         .to_usize()
                         .unwrap_or(0)
