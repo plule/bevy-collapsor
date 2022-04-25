@@ -50,83 +50,88 @@ fn setup(mut commands: Commands, rules: Res<Rules>, models: Res<ModelAssets>) {
     });
 
     commands
-        .spawn_bundle(PerspectiveCameraBundle {
-            transform: Transform::from_xyz(0.0, 20.0, 20.0)
-                .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-            ..default()
-        })
-        .insert_bundle(PickingCameraBundle::default())
-        .with_children(|camera| {
-            let rules_width = 16;
-            let rules_height = 16;
-            // UI
-            camera
-                .spawn_bundle(TransformBundle::from(
-                    Transform::identity()
-                        .looking_at(Vec3::Y, Vec3::Z)
-                        .with_translation(Vec3::new(-1.4, -0.2, -2.0))
-                        .with_scale(Vec3::new(0.04, 0.04, 0.04)),
-                ))
-                .insert(Name::from("ui"))
-                .with_children(|ui| {
-                    // Palette
-                    ui.spawn_bundle(TransformBundle::default())
-                        .insert(Name::from("palette"))
-                        .with_children(|palette| {
-                            for i in 0..rules.prototypes.len() {
-                                let prototype = &rules.prototypes[i];
-                                let model = prototype.model.clone();
-                                let x = i as i32 % rules_width;
-                                let y = -(i as i32 / rules_height) - 2;
-                                palette
-                                    .spawn_bundle(PbrBundle {
-                                        material: models.pick_mat.clone(),
-                                        mesh: models.pick_mesh.clone(),
-                                        ..Default::default()
-                                    })
-                                    .insert_bundle(PickableBundle::default())
-                                    .insert_bundle((
-                                        Name::from(format!("tile proto {i}")),
-                                        Coordinates::new(x, y),
-                                        Tile::new(i, Orientation::North),
-                                        PaletteTag {},
-                                    ))
-                                    .with_children(|tile| {
-                                        tile.spawn_bundle((
-                                            Transform::from_xyz(0.0, 0.2, 0.0),
-                                            GlobalTransform::default(),
-                                        ))
-                                        .with_children(
-                                            |tile| {
-                                                tile.spawn_scene(model);
-                                            },
-                                        );
-                                    });
-                            }
-                        });
+        .spawn_bundle(TransformBundle::from_transform(Transform::from_xyz(
+            0.0, 0.0, 6.0,
+        )))
+        .insert_bundle((Name::from("camera"), CameraHoldTag::default()))
+        .with_children(|commands| {
+            commands
+                .spawn_bundle(PerspectiveCameraBundle {
+                    transform: Transform::from_xyz(0.0, 20.0, 20.0)
+                        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+                    ..default()
+                })
+                .insert_bundle(PickingCameraBundle::default())
+                .with_children(|camera| {
+                    let rules_width = 16;
+                    let rules_height = 16;
+                    // UI
+                    camera
+                        .spawn_bundle(TransformBundle::from(
+                            Transform::identity()
+                                .looking_at(Vec3::Y, Vec3::Z)
+                                .with_translation(Vec3::new(-1.4, -0.2, -2.0))
+                                .with_scale(Vec3::new(0.04, 0.04, 0.04)),
+                        ))
+                        .insert(Name::from("ui"))
+                        .with_children(|ui| {
+                            // Palette
+                            ui.spawn_bundle(TransformBundle::default())
+                                .insert(Name::from("palette"))
+                                .with_children(|palette| {
+                                    for i in 0..rules.prototypes.len() {
+                                        let prototype = &rules.prototypes[i];
+                                        let model = prototype.model.clone();
+                                        let x = i as i32 % rules_width;
+                                        let y = -(i as i32 / rules_height) - 2;
+                                        palette
+                                            .spawn_bundle(PbrBundle {
+                                                material: models.pick_mat.clone(),
+                                                mesh: models.pick_mesh.clone(),
+                                                ..Default::default()
+                                            })
+                                            .insert_bundle(PickableBundle::default())
+                                            .insert_bundle((
+                                                Name::from(format!("tile proto {i}")),
+                                                Coordinates::new(x, y),
+                                                Tile::new(i, Orientation::North),
+                                                PaletteTag {},
+                                            ))
+                                            .with_children(|tile| {
+                                                tile.spawn_bundle((
+                                                    Transform::from_xyz(0.0, 0.2, 0.0),
+                                                    GlobalTransform::default(),
+                                                ))
+                                                .with_children(|tile| {
+                                                    tile.spawn_scene(model);
+                                                });
+                                            });
+                                    }
+                                });
 
-                    // Rule map
-                    ui.spawn_bundle(TransformBundle::default())
-                        .insert(Name::from("rule_map"))
-                        .with_children(|rule_map| {
-                            for x in 0..rules_width {
-                                for y in 0..rules_height {
-                                    rule_map
-                                        .spawn_bundle(PbrBundle {
-                                            material: models.pick_mat.clone(),
-                                            mesh: models.pick_mesh.clone(),
-                                            ..Default::default()
-                                        })
-                                        .insert_bundle((
-                                            Name::from(format!("{x}:{y}")),
-                                            Coordinates::new(x as i32, y as i32),
-                                            OptionalTile::default(),
-                                            DrawTile::default(),
-                                            RuleTileTag::default(),
-                                        ))
-                                        .insert_bundle(PickableBundle::default());
-                                }
-                            }
+                            // Rule map
+                            ui.spawn_bundle(TransformBundle::default())
+                                .insert(Name::from("rule_map"))
+                                .with_children(|rule_map| {
+                                    for x in 0..rules_width {
+                                        for y in 0..rules_height {
+                                            rule_map
+                                                .spawn_bundle(PbrBundle {
+                                                    material: models.pick_mat.clone(),
+                                                    mesh: models.pick_mesh.clone(),
+                                                    ..Default::default()
+                                                })
+                                                .insert_bundle((
+                                                    Name::from(format!("{x}:{y}")),
+                                                    Coordinates::new(x as i32, y as i32),
+                                                    OptionalTile::default(),
+                                                    DrawTile::default(),
+                                                    RuleTileTag::default(),
+                                                ))
+                                                .insert_bundle(PickableBundle::default());
+                                        }
+                                    }
+                                });
                         });
                 });
         });

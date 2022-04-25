@@ -11,7 +11,8 @@ impl Plugin for DisplayPlugin {
             .add_system(draw_rules)
             .add_system(draw_map)
             .add_system(apply_coordinate)
-            .add_system(animate_light_direction);
+            .add_system(animate_light_direction)
+            .add_system(animate_camera);
     }
 }
 
@@ -143,5 +144,11 @@ fn animate_light_direction(
             time.seconds_since_startup() as f32 * std::f32::consts::TAU / 20.0,
             -std::f32::consts::FRAC_PI_4,
         );
+    }
+}
+
+fn animate_camera(time: Res<Time>, mut query: Query<&mut Transform, With<CameraHoldTag>>) {
+    for mut transform in query.iter_mut() {
+        transform.rotation = Quat::from_rotation_y(time.seconds_since_startup() as f32 / 100.0);
     }
 }

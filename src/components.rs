@@ -73,6 +73,9 @@ impl FromWorld for ModelAssets {
     }
 }
 
+#[derive(Component, Inspectable, Default)]
+pub struct CameraHoldTag;
+
 /// Variation of the palette elements that are equivalents
 #[derive(Component, Inspectable, Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub enum Equivalences {
