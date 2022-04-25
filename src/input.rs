@@ -69,6 +69,7 @@ fn on_mouse_wheel(
     mut selection: ResMut<TileSelection>,
 ) {
     for event in mouse_wheel_events.iter() {
-        selection.rotation += event.y as i32;
+        let increment = if event.y > 0.0 { 1 } else { -1 };
+        selection.rotation += increment;
     }
 }
